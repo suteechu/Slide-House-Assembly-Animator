@@ -1,0 +1,30 @@
+{
+  "name": "integrated-design-bom-automation-v4",
+  "version": "4.0.0",
+  "main": "server.cjs",
+  "scripts": {
+    "test": "node test_ver3.cjs && node test_engine_headless.cjs && node test_ver4_e2e.cjs",
+    "build": "node node_modules/vite/bin/vite.js build",
+    "dev": "node node_modules/vite/bin/vite.js",
+    "start": "node server.cjs"
+  },
+  "keywords": [
+    "scg-heim",
+    "auto-bom",
+    "presentation-v4"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Integrated Design & BOM Automation - Ver4 Standalone Presentation Studio",
+  "type": "module",
+  "dependencies": {
+    "framer-motion": "^12.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.0"
+  }
+}
