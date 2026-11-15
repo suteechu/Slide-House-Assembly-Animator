@@ -9,6 +9,8 @@ const fmt = n => `${Math.floor((n || 0) / 60).toString().padStart(2, '0')}:${Mat
 function App() {
   const [japanese, setJapanese] = useState(true);
   const themeRef = useRef(true);
+  const [bgPreset, setBgPreset] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('dbpa_bg_preset')) || 'default');
+  const [bgColor, setBgColor] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('dbpa_bg_custom_color')) || '#eef5f1');
   const stage = useRef(null);
   const canvasRef = useRef(null);
   const initializedRef = useRef(false);
@@ -130,6 +132,14 @@ function App() {
     }
   };
 
+  const applyBgTheme = (preset, customColor = bgColor) => {
+    setBgPreset(preset);
+    setBgColor(customColor);
+    if (app && typeof app.setBackgroundTheme === 'function') {
+      app.setBackgroundTheme(preset, customColor);
+    }
+  };
+
   const switchSlide = (i) => {
     act(a => {
       a.selectSlide(i);
@@ -149,7 +159,37 @@ function App() {
             Integrated Design <span className="text-emerald-300">& BOM Automation</span>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="control flex items-center gap-1.5 py-1 px-2.5" title="ปรับสีพื้นหลังสไลด์ (Slide 10 & 12)">
+            <span className="text-xs font-semibold opacity-80">BG:</span>
+            {[
+              { id: 'default', label: 'Auto', color: 'linear-gradient(135deg,#1e3a31,#72ab99)' },
+              { id: 'washi', label: 'Washi', color: '#f7f5ee' },
+              { id: 'white', label: 'White', color: '#ffffff' },
+              { id: 'sage', label: 'Sage', color: '#dfeee7' },
+              { id: 'emerald-dark', label: 'Dark', color: '#132720' },
+              { id: 'blueprint', label: 'Navy', color: '#10243e' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyBgTheme(p.id, bgColor)}
+                title={`พื้นหลัง: ${p.label}`}
+                aria-label={`Background ${p.label}`}
+                className={`w-5 h-5 rounded-full border transition-transform ${bgPreset === p.id ? 'scale-110 ring-2 ring-emerald-500 border-white' : 'border-slate-400/60 opacity-85 hover:opacity-100'}`}
+                style={{ background: p.color }}
+              />
+            ))}
+            <label className="flex items-center gap-1 cursor-pointer ml-0.5" title="เลือกสีพื้นหลังเอง (Custom)">
+              <input
+                type="color"
+                value={bgColor}
+                onChange={(e) => applyBgTheme('custom', e.target.value)}
+                aria-label="Custom background color"
+                className={`w-5 h-5 p-0 border-0 rounded cursor-pointer bg-transparent ${bgPreset === 'custom' ? 'ring-2 ring-emerald-500 rounded-full' : ''}`}
+              />
+            </label>
+          </div>
           <button
             className="control"
             aria-pressed={japanese}

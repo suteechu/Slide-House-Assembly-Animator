@@ -16,10 +16,12 @@ class PresentationApp {
     if (typeof globalThis !== 'undefined') {
       globalThis.PresentationApp = PresentationApp;
     }
-    this.storageKey = window.PRESENTATION_V3 ? 'dbpa_bom_studio_ver3_20261115_16slides_v5' : 'dbpa_japanese_sim_studio_v51';
+    this.storageKey = window.PRESENTATION_V3 ? 'dbpa_bom_studio_ver3_20261116_16slides_v7' : 'dbpa_japanese_sim_studio_v51';
     this.themeVersion = 'v2';
     this.flowchartViewMode = 'both'; // 'both' | 'new' | 'existing'
     this.parallelBranchStyle = 'clean-minimal'; // 'clean-minimal' (รูป New) | 'ver2-dark'
+    this.bgPreset = 'default';
+    this.bgCustomColor = '#eef5f1';
     this.activeDocPreview = null; // 'partItems' | 'jobOrder' | 'sbList' | 'drawingAssembly'
     this.hoveredCard = null;
     this.automationActiveTab = null; // null for auto-cycle, or 0..4 for manual pin
@@ -30,6 +32,8 @@ class PresentationApp {
     const storage = (typeof localStorage !== 'undefined') ? localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
     try {
       if (storage) {
+        this.bgPreset = storage.getItem('dbpa_bg_preset') || 'default';
+        this.bgCustomColor = storage.getItem('dbpa_bg_custom_color') || '#eef5f1';
         // Clean up previous cached version keys so browser stays completely fresh
         ['dbpa_bom_studio_ver3_20261113', 'dbpa_bom_studio_ver3_20261113_10slides', 'dbpa_bom_studio_ver3_20261113_11slides', 'dbpa_bom_studio_ver3_20261114_12slides', 'dbpa_bom_studio_ver3_20261114_13slides', 'dbpa_bom_studio_ver3_20261114_14slides', 'dbpa_bom_studio_ver3_20261114_15slides', 'dbpa_bom_studio_ver3_20261114_15slides_v2', 'dbpa_bom_studio_ver3_20261114_15slides_v3', 'dbpa_bom_studio_ver3_20261115_16slides_v4', 'dbpa_japanese_sim_studio_v11', 'dbpa_japanese_sim_studio_v12', 'dbpa_japanese_sim_studio_v13', 'dbpa_japanese_sim_studio_v14', 'dbpa_japanese_sim_studio_v15', 'dbpa_japanese_sim_studio_v16', 'dbpa_japanese_sim_studio_v17', 'dbpa_japanese_sim_studio_v18', 'dbpa_japanese_sim_studio_v19', 'dbpa_japanese_sim_studio_v20', 'dbpa_japanese_sim_studio_v21', 'dbpa_japanese_sim_studio_v22', 'dbpa_japanese_sim_studio_v23', 'dbpa_japanese_sim_studio_v24', 'dbpa_japanese_sim_studio_v25', 'dbpa_japanese_sim_studio_v26', 'dbpa_japanese_sim_studio_v27', 'dbpa_japanese_sim_studio_v28', 'dbpa_japanese_sim_studio_v29', 'dbpa_japanese_sim_studio_v30', 'dbpa_japanese_sim_studio_v31', 'dbpa_japanese_sim_studio_v32', 'dbpa_japanese_sim_studio_v33', 'dbpa_japanese_sim_studio_v34', 'dbpa_japanese_sim_studio_v35', 'dbpa_japanese_sim_studio_v36', 'dbpa_japanese_sim_studio_v37', 'dbpa_japanese_sim_studio_v38', 'dbpa_japanese_sim_studio_v39', 'dbpa_japanese_sim_studio_v40', 'dbpa_japanese_sim_studio_v41', 'dbpa_japanese_sim_studio_v42', 'dbpa_japanese_sim_studio_v43', 'dbpa_japanese_sim_studio_v44', 'dbpa_japanese_sim_studio_v45', 'dbpa_japanese_sim_studio_v46', 'dbpa_japanese_sim_studio_v50'].forEach(k => {
           try { storage.removeItem(k); } catch (e) {}
@@ -163,22 +167,34 @@ class PresentationApp {
       this.illus[k] = im;
     });
 
-    // Real Factory Production Documents (Uploaded by User)
+    // Real Factory Production Documents & Generated Visuals
     this.factoryDocs = {
+      model3d: new Image(),
       partItems: new Image(),
       jobOrder: new Image(),
       sbList: new Image(),
       drawingAssembly: new Image(),
-      cadPunchingEe: new Image()
+      cadPunchingEe: new Image(),
+      gen01: new Image(),
+      gen02: new Image(),
+      gen03: new Image(),
+      gen04: new Image(),
+      gen05: new Image()
     };
     if (!isFileProtocol) {
       Object.values(this.factoryDocs).forEach(img => { img.crossOrigin = 'anonymous'; });
     }
+    this.factoryDocs.model3d.src = 'assets/design_stages/boq_3d_walls.png';
     this.factoryDocs.partItems.src = 'assets/design_stages/doc_part_items.png';
     this.factoryDocs.jobOrder.src = 'assets/design_stages/doc_job_order.png';
     this.factoryDocs.sbList.src = 'assets/design_stages/doc_sb_list.png';
     this.factoryDocs.drawingAssembly.src = 'assets/design_stages/doc_drawing_assembly.png';
     this.factoryDocs.cadPunchingEe.src = 'assets/design_stages/doc_cad_punching_ee.png';
+    this.factoryDocs.gen01.src = 'assets/design_stages/gen_deliverable_01_3d_model.jpg';
+    this.factoryDocs.gen02.src = 'assets/design_stages/gen_deliverable_02_2d_drawing.jpg';
+    this.factoryDocs.gen03.src = 'assets/design_stages/gen_deliverable_03_bom_table.jpg';
+    this.factoryDocs.gen04.src = 'assets/design_stages/gen_deliverable_04_job_order.jpg';
+    this.factoryDocs.gen05.src = 'assets/design_stages/gen_deliverable_05_sb_cnc.jpg';
 
     // Composite Automation Deliverables Summary Image (Uploaded by user)
     this.autoSummaryImg = new Image();
@@ -277,6 +293,121 @@ class PresentationApp {
     if (this._destroyed) return;
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     this.drawFrame(now / 1000);
+  }
+
+  setBackgroundTheme(preset, customColor) {
+    if (preset) this.bgPreset = preset;
+    if (customColor) this.bgCustomColor = customColor;
+    try {
+      const storage = (typeof localStorage !== 'undefined') ? localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
+      if (storage) {
+        storage.setItem('dbpa_bg_preset', this.bgPreset);
+        storage.setItem('dbpa_bg_custom_color', this.bgCustomColor);
+      }
+    } catch (e) {}
+    this.render();
+  }
+
+  getCustomBackgroundPalette(defaultTheme = 'mint') {
+    const parseHex = (hex) => {
+      const m = String(hex || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!m) return [238, 245, 241];
+      let h = m[1];
+      if (h.length === 3) h = h.split('').map(c => c + c).join('');
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    };
+    const mixHex = (rgb, target, t) => {
+      const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+      const r = clamp(rgb[0] + (target[0] - rgb[0]) * t);
+      const g = clamp(rgb[1] + (target[1] - rgb[1]) * t);
+      const b = clamp(rgb[2] + (target[2] - rgb[2]) * t);
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    };
+
+    const preset = this.bgPreset || 'default';
+    if (preset === 'washi') {
+      return {
+        preset, isDark: false,
+        stops: ['#f7f5ee', '#efece2', '#e5e0d2'],
+        cardFill: 'rgba(255, 255, 255, 0.94)', cardBorder: '#cbbca4',
+        titleColor: '#1b365d', ink: '#1e293b', muted: '#475569',
+        gridColor: 'rgba(27, 54, 93, 0.06)', accent: '#1b6d54', accent2: '#c84b31'
+      };
+    }
+    if (preset === 'white') {
+      return {
+        preset, isDark: false,
+        stops: ['#ffffff', '#f8fafc', '#eef2f6'],
+        cardFill: 'rgba(255, 255, 255, 0.98)', cardBorder: '#cbd5e1',
+        titleColor: '#0f172a', ink: '#0f172a', muted: '#475569',
+        gridColor: 'rgba(15, 23, 42, 0.045)', accent: '#047857', accent2: '#ea580c'
+      };
+    }
+    if (preset === 'sage') {
+      return {
+        preset, isDark: false,
+        stops: ['#edf6f2', '#dfeee7', '#cde4da'],
+        cardFill: 'rgba(255, 255, 255, 0.94)', cardBorder: '#9bc4b3',
+        titleColor: '#134e3a', ink: '#142a22', muted: '#3b574c',
+        gridColor: 'rgba(16, 185, 129, 0.08)', accent: '#047857', accent2: '#d97706'
+      };
+    }
+    if (preset === 'emerald-dark') {
+      return {
+        preset, isDark: true,
+        stops: ['#0c1713', '#132720', '#1b3b30'],
+        cardFill: 'rgba(255, 255, 255, 0.94)', cardBorder: '#34d399',
+        titleColor: '#f8fafc', ink: '#0f172a', muted: '#475569',
+        gridColor: 'rgba(52, 211, 153, 0.07)', accent: '#10b981', accent2: '#f97316'
+      };
+    }
+    if (preset === 'blueprint') {
+      return {
+        preset, isDark: true,
+        stops: ['#091526', '#10243e', '#173558'],
+        cardFill: 'rgba(248, 251, 255, 0.95)', cardBorder: '#60a5fa',
+        titleColor: '#f8fafc', ink: '#0f172a', muted: '#475569',
+        gridColor: 'rgba(96, 165, 250, 0.09)', accent: '#0284c7', accent2: '#f97316'
+      };
+    }
+    if (preset === 'custom') {
+      const rgb = parseHex(this.bgCustomColor);
+      const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+      const isDark = lum < 0.45;
+      return {
+        preset, isDark,
+        stops: isDark
+          ? [mixHex(rgb, [0, 0, 0], 0.25), mixHex(rgb, [0, 0, 0], 0.0), mixHex(rgb, [255, 255, 255], 0.12)]
+          : [mixHex(rgb, [255, 255, 255], 0.35), mixHex(rgb, [255, 255, 255], 0.0), mixHex(rgb, [0, 0, 0], 0.08)],
+        cardFill: 'rgba(255, 255, 255, 0.94)',
+        cardBorder: isDark ? mixHex(rgb, [255, 255, 255], 0.4) : mixHex(rgb, [0, 0, 0], 0.22),
+        titleColor: isDark ? '#f8fafc' : '#0f172a',
+        ink: '#0f172a',
+        muted: '#475569',
+        gridColor: isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(15, 23, 42, 0.055)',
+        accent: '#047857',
+        accent2: '#ea580c'
+      };
+    }
+
+    if (defaultTheme === 'dark-emerald') {
+      return {
+        preset: 'default', isDark: true,
+        stops: ['#0d1613', '#13231e', '#19332a', '#1f4035'],
+        cardFill: 'rgba(255, 255, 255, 0.96)', cardBorder: 'rgba(16, 185, 129, 0.35)',
+        titleColor: '#ffffff', ink: '#0f172a', muted: '#475569',
+        gridColor: 'rgba(52, 211, 153, 0.05)', accent: '#10b981', accent2: '#ea580c'
+      };
+    }
+
+    // Default Slide 10 Mint-Emerald Architectural backdrop
+    return {
+      preset: 'default', isDark: false,
+      stops: ['#141a18', '#466157', '#72ab99', '#8dd1be'],
+      cardFill: 'rgba(248, 250, 249, 0.95)', cardBorder: '#065f46',
+      titleColor: '#f8fafc', ink: '#0f172a', muted: '#334155',
+      gridColor: 'rgba(255, 255, 255, 0.06)', accent: '#047857', accent2: '#dc2626'
+    };
   }
 
   getOrCreateVideo(src) {
@@ -848,13 +979,8 @@ class PresentationApp {
     const slide = this.slides[this.activeSlideIndex];
     if (!slide) return;
 
-    if (slide.sceneType === 'automation-deliverables-summary') {
-      const autoVdos = ['VDO/3D.mp4', 'VDO/2D.mp4', 'VDO/BOM.mp4', 'VDO/Job Order.mp4', 'VDO/SB List.mp4'];
-      this.videoCache.forEach((vid, src) => {
-        if (!autoVdos.includes(src)) {
-          vid.pause();
-        }
-      });
+    if (slide.sceneType === 'automation-deliverables-summary' || slide.sceneType === 'new-workflow-allinone' || slide.layout === 'new-workflow-allinone') {
+      this.videoCache.forEach((vid) => { vid.pause(); });
       return;
     }
 
@@ -1361,7 +1487,7 @@ class PresentationApp {
     } else if (type === 'parallel-branch-split') {
       this.drawParallelBranchSplitScene(ctx, box, slide, animSec, nowSec);
     } else if (type === 'automation-deliverables-summary') {
-      this.drawAutomationDeliverablesSummaryScene(ctx, box, slide, animSec, nowSec);
+      this.drawDeliverablesShowcaseScene(ctx, box, slide, animSec, nowSec);
     } else if (type === 'pipeline-route-1') {
       this.drawPipelineRoute1Scene(ctx, box, slide, animSec, nowSec);
     } else if (type === 'pipeline-route-a') {
@@ -3063,9 +3189,11 @@ class PresentationApp {
     ctx.fillText('X', axX + 28, axY + 18);
     ctx.fillText('Y', axX - 30, axY + 18);
 
-    // 3. 3D Isometric Wall & Stud Extrusion Simulation
-    const isoCenterX = x + (w - 380) * 0.48;
-    const isoCenterY = y + h * 0.52;
+    // 3. 3D Isometric Wall & Stud Extrusion Simulation (occupies clean wide Left+Center space; Right reserved for 20X Console)
+    const termReserve = Math.min(448, Math.max(388, Math.floor(w * 0.34))) + 22;
+    const midSpan = Math.max(340, w - termReserve);
+    const isoCenterX = x + midSpan * 0.50;
+    const isoCenterY = y + h * 0.53;
 
     // Draw Floor Slab Base in Isometric
     ctx.fillStyle = 'rgba(30, 41, 59, 0.85)';
@@ -3164,78 +3292,14 @@ class PresentationApp {
     ctx.fillText('CAD EE PUNCH: BOX 40x80 @ H+300 mm', punchX + 34, punchY + 4);
     ctx.restore();
 
-    // Laser Scan Horizontal Line (Ruby Auto-BOM Scanner)
+    // Laser Scan Horizontal Line (Ruby Auto-BOM Scanner across Left+Center 3D viewport)
     const scanLineY = y + 45 + ((animSec * 60) % (h - 90));
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
     ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.moveTo(x + 10, scanLineY);
-    ctx.lineTo(x + w - 390, scanLineY);
+    ctx.moveTo(x + 24, scanLineY);
+    ctx.lineTo(x + midSpan - 12, scanLineY);
     ctx.stroke();
-
-    // 4. Live Ruby Execution Terminal HUD (Right Overlay)
-    const termW = 360;
-    const termH = h - 28;
-    const termX = x + w - termW - 14;
-    const termY = y + 14;
-
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-    this.roundRect(ctx, termX, termY, termW, termH, 10);
-    ctx.fill();
-    ctx.strokeStyle = '#0284C7';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    // Terminal Header
-    ctx.fillStyle = '#1E293B';
-    this.roundRect(ctx, termX, termY, termW, 36, 10);
-    ctx.fill();
-    // 3 Mac-style window dots
-    ctx.fillStyle = '#EF4444'; ctx.beginPath(); ctx.arc(termX + 16, termY + 18, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#F59E0B'; ctx.beginPath(); ctx.arc(termX + 30, termY + 18, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#10B981'; ctx.beginPath(); ctx.arc(termX + 44, termY + 18, 4.5, 0, Math.PI * 2); ctx.fill();
-
-    ctx.fillStyle = '#F8FAFC';
-    ctx.font = '700 12.5px "JetBrains Mono", monospace';
-    ctx.fillText('Ruby Engine Console · QHeim v3', termX + 60, termY + 22);
-
-    // Terminal Log Stream
-    const logLines = [
-      { t: '> ruby QHeim_AutoBOM.rb --mode=3d', c: '#93C5FD' },
-      { t: '[1/5] OTF 2D Floorplan parsed', c: '#34D399' },
-      { t: '[2/5] P-Rule 1..19 grid verified', c: '#34D399' },
-      { t: '[3/5] 3D C75 Studs extruded: 48 pcs', c: '#38BDF8' },
-      { t: '[4/5] CAD EE: 16 Switch boxes punched', c: '#FBBF24' },
-      { t: '[5/5] 5 Deliverables generated', c: '#A7F3D0' },
-      { t: '----------------------------------', c: '#475569' },
-      { t: 'STATUS: 100% READY FOR FACTORY', c: '#22C55E' },
-      { t: 'EXECUTION TIME: 01:42 (<= 2 Min)', c: '#F472B6' }
-    ];
-
-    let logY = termY + 58;
-    const maxVisible = Math.min(logLines.length, Math.floor((termH - 74) / 22));
-    ctx.font = '600 11.5px "JetBrains Mono", monospace';
-    for (let li = 0; li < maxVisible; li++) {
-      const line = logLines[li];
-      ctx.fillStyle = line.c;
-      ctx.fillText(line.t, termX + 14, logY);
-      logY += 22;
-    }
-
-    // Animated Blinking Cursor
-    if (Math.sin(nowSec * 6) > 0) {
-      ctx.fillStyle = '#38BDF8';
-      ctx.fillRect(termX + 14, logY + 2, 8, 14);
-    }
-
-    // Bottom Progress Meter
-    const pct = Math.min(100, Math.floor(animSec * 7.5));
-    ctx.fillStyle = '#334155';
-    this.roundRect(ctx, termX + 14, termY + termH - 24, termW - 28, 10, 5);
-    ctx.fill();
-    ctx.fillStyle = '#059669';
-    this.roundRect(ctx, termX + 14, termY + termH - 24, (termW - 28) * (pct / 100), 10, 5);
-    ctx.fill();
 
     ctx.restore();
   }
@@ -3299,24 +3363,21 @@ class PresentationApp {
     const contentH = box.h - pillH - 26;
     const availW = box.w - 20;
 
-    // Layout configuration
-    const compactW = 470;
-    const rightColW = 260;
-    const pipeCorridorW = 44;
-    const rightColX = box.x + 10 + availW - rightColW;
+    // Layout configuration: Left OTF Box aligned flush to [01] OTF Input pill; Center VDO expanded full width to right edge
+    const compactW = Math.round(pillW);
 
-    // Left Viewport Width: Starts Full Screen (availW), then smoothly shrinks down to compactW (470px)
+    // Left Viewport Width: Starts Full Screen (availW), then smoothly shrinks down to exact [01] OTF Input pill width
     const leftX = box.x + 10;
     const leftY = contentY;
     const leftW = Math.round(availW - (availW - compactW) * shrinkP);
     const leftH = contentH;
 
-    // Center VDO Monitor coordinates (positioned in center space)
+    // Center VDO Monitor coordinates (Expanded full-width across remaining stage)
     const vdoX = leftX + compactW + 16;
-    const vdoW = Math.max(100, rightColX - pipeCorridorW - vdoX);
+    const vdoRight = leftX + availW;
+    const vdoW = Math.max(100, vdoRight - vdoX);
     const vdoY = contentY;
     const vdoH = contentH;
-    const vdoRight = vdoX + vdoW;
 
     // 4. DRAW LEFT VIEWPORT ("รูปด้านซ้าย ปรับให้เล็กลง")
     ctx.save();
@@ -3712,10 +3773,9 @@ class PresentationApp {
         this.drawSketchUpLiveSimulationStudio(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH, animSec, nowSec);
       }
 
-      // Bottom Video HUD Scrubber & Timecode
-      // Running throughout video duration strictly <= 120s ("ปรับเป็น วิ่งตลอด ตาม Vdo รัน" & "Fix ไม่เกิน 2 นาที")
+      // Bottom Video HUD Scrubber & Timecode (Default 120s = 02:00 max timeline; Code streams 00:02 -> 01:55)
       const hudBarH = 34;
-      const rawVdoSec = (vid && !isNaN(vid.duration) && vid.duration > 0) ? vid.duration : 79;
+      const rawVdoSec = (vid && !isNaN(vid.duration) && vid.duration > 0) ? vid.duration : 120;
       const vdoTotalSec = Math.min(120, rawVdoSec);
       const currentVdoTime = (vid && !isNaN(vid.currentTime) && vid.currentTime > 0) ? vid.currentTime : Math.max(0, animSec - vdoDelay);
       const vdoElapsed = Math.min(vdoTotalSec, currentVdoTime);
@@ -3723,14 +3783,12 @@ class PresentationApp {
       // Save VDO monitor hit rect for direct click-to-play on Slide 03
       this.vdoMonitorRect = { x: vidBoxX, y: vidBoxY, w: vidBoxW, h: vidBoxH };
 
-      // 6.1 LIVE CODE CONSOLE STREAMER ("ปรับเป็น วิ่งตลอด ตาม Vdo รัน")
-      if (!isPureVector) {
-        const isRunning = this.isPlaying && (!vid || !vid.paused);
-        this.drawLiveCodeTerminalStreamer(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH - hudBarH, vdoElapsed, vdoTotalSec, nowSec, isRunning);
-      }
+      // 6.1 UNIFIED RIGHT 20X CODE CONSOLE HUD (Left overlay removed; Right Console runs 00:02 -> 01:55 at 20X)
+      const isStreamActive = this.isPlaying && (!vid || !vid.paused);
+      this.drawLiveCodeTerminalStreamer(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH - hudBarH, vdoElapsed, vdoTotalSec, nowSec, isStreamActive);
 
       const hudBarY = vidBoxY + vidBoxH - hudBarH;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
       ctx.fillRect(vidBoxX, hudBarY, vidBoxW, hudBarH);
 
       const curVdoStr = this.formatTime(vdoElapsed);
@@ -3738,7 +3796,7 @@ class PresentationApp {
 
       ctx.fillStyle = '#E2E8F0';
       ctx.font = '600 13px "Prompt", sans-serif';
-      ctx.fillText(`⚡ รันปลั๊กอินอัตโนมัติ: ${curVdoStr} / ${totVdoStr} • QHeim Engine (Fix ≤ 02:00 นาที)`, vidBoxX + 16, hudBarY + 22);
+      ctx.fillText(`⚡ รันปลั๊กอินอัตโนมัติ: ${curVdoStr} / ${totVdoStr} • QHeim 20X Engine (รันโค้ด 00:02 – 01:55)`, vidBoxX + 16, hudBarY + 22);
 
       // Progress Line Bar running smoothly along with video
       const progP = (vdoTotalSec > 0) ? Math.min(1.0, vdoElapsed / vdoTotalSec) : 0;
@@ -3751,224 +3809,11 @@ class PresentationApp {
       ctx.restore();
     }
 
-    // 7. DRAW RIGHT PARALLEL BRANCH BUTTONS & CLEAN PIPES ("VDO รันอยู่ จะมี PartItems ต่อ ช่วงท้าย" + "จัดให้ เส้นสาย ครีนๆๆ")
-    // Exactly matches user mockup media_1794545950970_22e0c91a.jpg
-    const rightCards = [
-      { id: 'partItems', label: 'PartItems', sub: 'MRP ➔ Purchase (PO Auto)', docKey: 'partItems', icon: '📋' },
-      { id: 'jobOrder', label: 'Job Order /\nPicking List', sub: 'ใบสั่งผลิต ➔ Production', docKey: 'jobOrder', icon: '📑' },
-      { id: 'sbList', label: 'SB List', sub: 'CAD Punching ➔ CNC', docKey: 'sbList', icon: '📐' },
-      { id: 'drawing', label: '2D & 3D\nDrawing', sub: 'แบบประกอบ Shop Drawing', docKey: 'drawingAssembly', icon: '🏗️' }
-    ];
+    // Right 4 Parallel Branch boxes (PartItems, Job Order, SB List, 2D & 3D) omitted here
+    // per user request so Center VDO Monitor expands large and clean.
+    this.rightBranchButtons = [];
 
-    const btnCount = 4;
-    const btnW = rightColW - 16;
-    const btnH = 88;
-    const btnGap = 20;
-    const totalBtnsH = btnCount * btnH + (btnCount - 1) * btnGap;
-    const btnStartY = contentY + (contentH - totalBtnsH) / 2;
-    const btnX = rightColX + 8;
-    const trunkX = vdoRight + 20;
-    const trunkY = vdoY + vdoH / 2;
-
-    // 4-button alternating bounce cycle ("ปรับโชว์ เด้ง ขึ้นมา ดับไป สลับกันไป")
-    const bouncePeriod = 1.1; // 1.1s per button, full cycle 4.4s looping indefinitely
-    const slot = (nowSec / bouncePeriod) % rightCards.length;
-    const curActiveBtnIdx = Math.floor(slot);
-    const btnPhaseProg = slot - curActiveBtnIdx; // 0.0 to 1.0
-
-    // 7. DRAW RIGHT PARALLEL BRANCH BUTTONS & CLEAN PIPES ("ซ่อนตรงนี้ โชว์ หลังจาก หลัง VOD เลยครับ")
-    // Completely HIDDEN during CAD floorplan & initial VDO run; smoothly slides in and appears AFTER VDO (btnEntranceP > 0.001)
-    this.rightBranchButtons = []; // reset for hit testing with active positions
-
-    if (btnEntranceP > 0.001) {
-      // 7.1 CLEAN CONNECTING PIPES FROM SKETCHUP VDO TO 4 BUTTONS ("จัดให้ เส้นสาย ครีนๆๆ")
-      ctx.save();
-      ctx.globalAlpha = btnEntranceP;
-
-      // Small output socket on VDO right border
-      ctx.fillStyle = '#0284C7';
-      this.roundRect(ctx, vdoRight - 4, trunkY - 20, 10, 40, 4);
-      ctx.fill();
-      ctx.strokeStyle = '#38BDF8';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Horizontal main trunk from VDO right to bus line
-      ctx.strokeStyle = '#38BDF8';
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.moveTo(vdoRight + 6, trunkY);
-      ctx.lineTo(trunkX, trunkY);
-      ctx.stroke();
-
-      // Vertical bus line spanning all 4 button centerlines
-      const firstY = btnStartY + btnH / 2;
-      const lastY = btnStartY + (btnCount - 1) * (btnH + btnGap) + btnH / 2;
-      ctx.beginPath();
-      ctx.moveTo(trunkX, firstY);
-      ctx.lineTo(trunkX, lastY);
-      ctx.stroke();
-
-      // Branch lines going horizontally into each button
-      rightCards.forEach((btn, bIdx) => {
-        const by = btnStartY + bIdx * (btnH + btnGap);
-        const bcy = by + btnH / 2;
-        const isHoverOrActive = this.hoveredCard === btn.id || this.activeDocPreview === btn.docKey;
-        const isCurCycle = (bIdx === curActiveBtnIdx);
-
-        // Clean horizontal line
-        const branchActive = isHoverOrActive || isCurCycle;
-        ctx.strokeStyle = branchActive ? '#38BDF8' : 'rgba(56, 189, 248, 0.35)';
-        ctx.lineWidth = branchActive ? 3.0 : 1.8;
-        if (branchActive) {
-          ctx.shadowColor = '#38BDF8';
-          ctx.shadowBlur = 8;
-        } else {
-          ctx.shadowBlur = 0;
-        }
-        ctx.beginPath();
-        ctx.moveTo(trunkX, bcy);
-        ctx.lineTo(btnX, bcy);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Arrowhead / Node into button
-        ctx.fillStyle = branchActive ? '#93C5FD' : 'rgba(56, 189, 248, 0.45)';
-        ctx.beginPath();
-        ctx.arc(btnX - 2, bcy, branchActive ? 5.0 : 3.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Animated traveling light photon along branch (faster & brighter when active)
-        const flowSpeed = branchActive ? 2.5 : 1.0;
-        const flowProg = (nowSec * flowSpeed + bIdx * 0.25) % 1;
-        const photonX = trunkX + (btnX - trunkX) * flowProg;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowColor = '#60A5FA';
-        ctx.shadowBlur = branchActive ? 12 : 4;
-        ctx.beginPath();
-        ctx.arc(photonX, bcy, branchActive ? 4.0 : 2.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      });
-
-      ctx.restore();
-
-      // 7.2 DRAW 4 ROYAL BLUE BUTTONS (Alternating Bounce-up & Dim-down: "เด้ง ขึ้นมา ดับไป สลับกันไป")
-      const entranceSlideX = (1 - btnEntranceP) * 80;
-
-      rightCards.forEach((btn, bIdx) => {
-        let bounce = 0, alpha = 0.35, glow = 0;
-        if (bIdx === curActiveBtnIdx) {
-          if (btnPhaseProg < 0.20) {
-            const t = btnPhaseProg / 0.20;
-            const ease = 1 - Math.pow(1 - t, 3);
-            const overshoot = Math.sin(t * Math.PI) * 0.25;
-            bounce = ease + overshoot;
-            alpha = 0.35 + 0.65 * ease;
-            glow = ease;
-          } else if (btnPhaseProg < 0.75) {
-            const breathe = Math.sin((btnPhaseProg - 0.20) / 0.55 * Math.PI * 2);
-            bounce = 1.0 + 0.04 * breathe;
-            alpha = 1.0;
-            glow = 1.0;
-          } else {
-            const t = (btnPhaseProg - 0.75) / 0.25;
-            const drop = t * t * (3 - 2 * t);
-            bounce = 1.0 - drop;
-            alpha = 1.0 - 0.65 * drop;
-            glow = 1.0 - drop;
-          }
-        }
-
-        const isHoverOrActive = this.hoveredCard === btn.id || this.activeDocPreview === btn.docKey;
-        if (isHoverOrActive) {
-          bounce = 1.08;
-          alpha = 1.0;
-          glow = 1.0;
-        }
-
-        const dynamicSlideX = -14 * bounce;
-        const dynamicScale = 1.0 + 0.06 * bounce;
-        const bx = btnX + entranceSlideX + dynamicSlideX;
-        const by = btnStartY + bIdx * (btnH + btnGap);
-
-        // Register bounding box for hit-testing (mouse hover & click) ONLY when visible
-        if (btnEntranceP > 0.6) {
-          this.rightBranchButtons.push({
-            id: btn.id,
-            docKey: btn.docKey,
-            x: bx - 8,
-            y: by - 4,
-            w: btnW + 16,
-            h: btnH + 8
-          });
-        }
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0.35, alpha) * btnEntranceP;
-
-        // Scale transformation around button center
-        const bcx = bx + btnW / 2;
-        const bcy = by + btnH / 2;
-        ctx.translate(bcx, bcy);
-        ctx.scale(dynamicScale, dynamicScale);
-        ctx.translate(-bcx, -bcy);
-
-        // Glow effect
-        if (glow > 0.05 || isHoverOrActive) {
-          ctx.shadowColor = '#60A5FA';
-          ctx.shadowBlur = Math.round(10 + 16 * glow);
-          ctx.shadowOffsetY = 2;
-        } else {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetY = 3;
-        }
-
-        // Royal Blue Button Background
-        ctx.fillStyle = isHoverOrActive ? '#1D4ED8' : (glow > 0.25 ? '#2563EB' : '#1E40AF');
-        this.roundRect(ctx, bx, by, btnW, btnH, 18);
-        ctx.fill();
-
-        // Button Border
-        ctx.strokeStyle = isHoverOrActive ? '#93C5FD' : (glow > 0.15 ? `rgba(147, 197, 253, ${(0.4 + 0.6 * glow).toFixed(2)})` : 'rgba(255, 255, 255, 0.28)');
-        ctx.lineWidth = isHoverOrActive ? 3.0 : (1.8 + 1.2 * bounce);
-        ctx.stroke();
-
-        // Top subtle glass highlight
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(bx + 18, by + 3);
-        ctx.lineTo(bx + btnW - 18, by + 3);
-        ctx.stroke();
-
-        // Main Title Text
-        ctx.fillStyle = '#FFFFFF';
-        const lines = btn.label.split('\n');
-        if (lines.length === 1) {
-          this.fillFittedText(ctx, lines[0], bx + btnW / 2, by + btnH / 2 - 3, btnW - 28, 21, '800', '"Prompt", sans-serif', 'center');
-          ctx.fillStyle = (glow > 0.2 || isHoverOrActive) ? '#BFDBFE' : '#94A3B8';
-          this.fillFittedText(ctx, btn.sub, bx + btnW / 2, by + btnH / 2 + 19, btnW - 24, 11.5, '600', '"Prompt", sans-serif', 'center');
-        } else {
-          this.fillFittedText(ctx, lines[0], bx + btnW / 2, by + btnH / 2 - 16, btnW - 28, 16.5, '800', '"Prompt", sans-serif', 'center');
-          this.fillFittedText(ctx, lines[1], bx + btnW / 2, by + btnH / 2 + 5, btnW - 28, 16.5, '800', '"Prompt", sans-serif', 'center');
-          ctx.fillStyle = (glow > 0.2 || isHoverOrActive) ? '#BFDBFE' : '#94A3B8';
-          this.fillFittedText(ctx, btn.sub, bx + btnW / 2, by + btnH / 2 + 25, btnW - 24, 10.5, '600', '"Prompt", sans-serif', 'center');
-        }
-
-        // Small Click Hint / Inspection Pill at Top-Right
-        ctx.fillStyle = (glow > 0.2 || isHoverOrActive) ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.18)';
-        this.roundRect(ctx, bx + btnW - 28, by + 7, 20, 20, 6);
-        ctx.fill();
-        ctx.fillStyle = '#FFFFFF';
-        this.fillFittedText(ctx, '↗', bx + btnW - 18, by + 21, 14, 12, '800', 'sans-serif', 'center');
-
-        ctx.restore();
-      });
-    }
-
-    // 8. FLOATING DOCUMENT PREVIEW MODAL (When clicking any of the 4 buttons)
+    // 8. FLOATING DOCUMENT PREVIEW MODAL (Fallback if triggered)
     if (this.activeDocPreview && this.factoryDocs) {
       this.drawDocumentPreviewModal(ctx, box, contentY, contentH);
     }
@@ -3976,141 +3821,178 @@ class PresentationApp {
     ctx.restore();
   }
 
-  // ==================== LIVE CODE CONSOLE STREAMER IN VDO MONITOR ====================
-  // User request: "กรอบสีแดง โชว์โค็ด วิ่ง ตอนรัน" (matching media_1794552173075_faa8ee2b.png)
+  // ==================== RIGHT LIVE 20X RUBY CODE CONSOLE STREAMER (00:02 -> 01:55) ====================
   drawLiveCodeTerminalStreamer(ctx, x, y, maxW, maxH, vdoElapsed, vdoTotalSec, nowSec, isRunning = true) {
-    const codeW = Math.min(270, Math.max(220, Math.floor(maxW * 0.25)));
-    const codeH = maxH;
-    const termX = x;
-    const termY = y;
+    const codeW = Math.min(448, Math.max(388, Math.floor(maxW * 0.34)));
+    const codeH = Math.max(200, maxH - 24);
+    const termX = x + maxW - codeW - 14;
+    const termY = y + 12;
+
+    const startSec = 2.0;
+    const endSec = 115.0; // 1 minute 55 seconds
+    const runWindow = endSec - startSec; // 113.0s
+    const speedMultiplier = 20.0;
+
+    const phase = vdoElapsed < startSec ? 'waiting' : (vdoElapsed >= endSec ? 'done' : 'running');
+    const clampedRunElapsed = Math.min(runWindow, Math.max(0, vdoElapsed - startSec));
+    const windowProg = (phase === 'waiting') ? 0 : (phase === 'done' ? 1 : (clampedRunElapsed / runWindow));
 
     ctx.save();
 
-    // 1. Semi-transparent Dark IDE Terminal Backdrop
-    ctx.fillStyle = 'rgba(10, 15, 29, 0.92)';
-    ctx.fillRect(termX, termY, codeW, codeH);
-
-    // Right accent border with subtle cyan glow
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.50)';
+    // 1. Rounded Dark Console Backdrop + Cyan/Emerald Accent Border
+    ctx.fillStyle = 'rgba(10, 15, 29, 0.94)';
+    this.roundRect(ctx, termX, termY, codeW, codeH, 10);
+    ctx.fill();
+    ctx.strokeStyle = phase === 'running' ? 'rgba(16, 185, 129, 0.72)' : 'rgba(56, 189, 248, 0.55)';
     ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(termX + codeW, termY);
-    ctx.lineTo(termX + codeW, termY + codeH);
     ctx.stroke();
 
-    // 2. Terminal Header Bar (Height: 32px)
-    const headH = 32;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.98)';
-    ctx.fillRect(termX, termY, codeW, headH);
-
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)';
-    ctx.lineWidth = 1;
+    // 2. Terminal Header Bar (Height: 36px)
+    const headH = 36;
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(termX, termY + headH);
-    ctx.lineTo(termX + codeW, termY + headH);
-    ctx.stroke();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(termX, termY, codeW, headH, [10, 10, 0, 0]);
+    else ctx.rect(termX, termY, codeW, headH);
+    ctx.fillStyle = '#1E293B';
+    ctx.fill();
+    ctx.restore();
 
-    // 3 Mac-style window dots (Red, Amber, Green)
-    const dotR = 3.6;
-    const dotY = termY + 16;
+    // 3 Mac-style window dots
+    const dotY = termY + 18;
     [
-      { c: '#EF4444', x: termX + 12 },
-      { c: '#F59E0B', x: termX + 23 },
-      { c: '#10B981', x: termX + 34 }
+      { c: '#EF4444', x: termX + 16 },
+      { c: '#F59E0B', x: termX + 30 },
+      { c: '#10B981', x: termX + 44 }
     ].forEach(d => {
       ctx.fillStyle = d.c;
       ctx.beginPath();
-      ctx.arc(d.x, dotY, dotR, 0, Math.PI * 2);
+      ctx.arc(d.x, dotY, 4.2, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Script title
-    ctx.fillStyle = '#CBD5E1';
-    ctx.font = '700 11px "JetBrains Mono", monospace';
-    ctx.fillText('⚡ QHeim_AutoBOM.rb', termX + 46, termY + 20);
+    // Console Title (fitted cleanly clear of top-right status badge)
+    ctx.fillStyle = '#F8FAFC';
+    this.fillFittedText(ctx, 'Ruby Engine · QHeim_AutoBOM.rb', termX + 58, termY + 22, Math.max(80, codeW - 186), 11.8, '700', '"JetBrains Mono", monospace');
 
-    // Right Status Badge: RUNNING 20X or PAUSED (Matching user image media_1794559600451_1d349086.jpg)
-    const badgeW = isRunning ? 104 : 78;
-    const badgeH = 18;
-    const badgeX = termX + codeW - badgeW - 8;
-    const badgeY = termY + 7;
+    // Top-Right Status Badge: WAIT 00:02 / RUNNING 20X / DONE 01:55
+    const badgeW = 108;
+    const badgeH = 20;
+    const badgeX = termX + codeW - badgeW - 10;
+    const badgeY = termY + 8;
 
-    ctx.fillStyle = isRunning ? 'rgba(34, 197, 94, 0.22)' : 'rgba(245, 158, 11, 0.22)';
-    this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 4);
+    const badgeFill = phase === 'running'
+      ? 'rgba(34, 197, 94, 0.24)'
+      : (phase === 'done' ? 'rgba(16, 185, 129, 0.28)' : 'rgba(245, 158, 11, 0.22)');
+    ctx.fillStyle = badgeFill;
+    this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 5);
     ctx.fill();
 
-    const dotPulse = isRunning ? (0.5 + 0.5 * Math.sin(nowSec * 8)) : 1.0;
-    ctx.fillStyle = isRunning ? `rgba(34, 197, 94, ${dotPulse})` : '#F59E0B';
+    const dotPulse = phase === 'running' ? (0.5 + 0.5 * Math.sin(nowSec * 10)) : 1.0;
+    ctx.fillStyle = phase === 'waiting'
+      ? '#F59E0B'
+      : `rgba(52, 211, 153, ${dotPulse})`;
     ctx.beginPath();
-    ctx.arc(badgeX + 8, badgeY + badgeH / 2, 3, 0, Math.PI * 2);
+    ctx.arc(badgeX + 10, badgeY + badgeH / 2, 3.2, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = isRunning ? '#86EFAC' : '#FDE68A';
-    ctx.font = '700 9.5px "JetBrains Mono", monospace';
-    ctx.fillText(isRunning ? '● RUNNING 20X' : '● PAUSED', badgeX + 16, badgeY + 12.5);
+    ctx.fillStyle = phase === 'waiting' ? '#FDE68A' : '#86EFAC';
+    ctx.font = '800 10px "JetBrains Mono", monospace';
+    const statusLabel = phase === 'waiting' ? 'WAIT 00:02' : (phase === 'done' ? 'DONE 01:55' : 'RUNNING 20X');
+    ctx.fillText(statusLabel, badgeX + 19, badgeY + 13.5);
 
-    // 3. Code Lines Data (Authentic SketchUp Ruby Plugin automation script)
+    // 2.5 Telemetry Sub-Bar (Batch counter & Run Window)
+    const subBarY = termY + headH;
+    const subBarH = 24;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
+    ctx.fillRect(termX + 1, subBarY, codeW - 2, subBarH);
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(termX, subBarY + subBarH);
+    ctx.lineTo(termX + codeW, subBarY + subBarH);
+    ctx.stroke();
+
+    const passNum = phase === 'waiting' ? 0 : (phase === 'done' ? 20 : Math.min(20, Math.floor(windowProg * 20) + 1));
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = '700 10px "JetBrains Mono", monospace';
+    ctx.fillText(`> ruby QHeim_AutoBOM.rb --20x  [Pass ${String(passNum).padStart(2, '0')}/20]`, termX + 12, subBarY + 15);
+
+    ctx.fillStyle = phase === 'done' ? '#34D399' : '#94A3B8';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${this.formatTime(Math.min(endSec, Math.max(0, vdoElapsed)))} / 01:55`, termX + codeW - 12, subBarY + 15);
+    ctx.textAlign = 'left';
+
+    // 3. Rich SketchUp Ruby Plugin + Engine Output Code Stream
     const scriptLines = [
-      { type: 'comment', text: '# QHeim Auto BOM Engine v2.4' },
-      { type: 'keyword', text: 'require "sketchup.rb"' },
-      { type: 'keyword', text: 'require "json"' },
-      { type: 'comment', text: '# [1] Load OTF & Rules' },
-      { type: 'code', text: 'model = Sketchup.active_model' },
-      { type: 'code', text: 'otf = OTF.load("Forcon.dwg")' },
-      { type: 'code', text: 'rules = DB.bind(:MIM, :IM)' },
-      { type: 'log', text: '>> [OK] P-Rules 1..19 Loaded' },
-      { type: 'comment', text: '# [2] Extrude Wall C75' },
-      { type: 'keyword', text: 'otf.walls.each do |w|' },
-      { type: 'code', text: '  studs = w.calc_framing(450)' },
-      { type: 'code', text: '  grp = model.entities.add_grp' },
-      { type: 'code', text: '  grp.extrude_c75(studs, 2800)' },
-      { type: 'log', text: '>> [BUILD] C75 Wall ±1mm' },
-      { type: 'keyword', text: 'end' },
-      { type: 'comment', text: '# [3] MEP Outlet Punching' },
-      { type: 'code', text: 'outlets = otf.get_mep_pts()' },
-      { type: 'keyword', text: 'outlets.each do |pt|' },
-      { type: 'code', text: '  stud = model.nearest_stud(pt)' },
-      { type: 'code', text: '  stud.punch_ee_hole(dia: 35)' },
-      { type: 'log', text: '>> [PUNCH] MEP EE Punched' },
-      { type: 'keyword', text: 'end' },
-      { type: 'comment', text: '# [4] 4 Deliverables Export' },
-      { type: 'code', text: 'bom = AutoBOM.build(model)' },
-      { type: 'code', text: 'bom.export_excel("PartItems")' },
-      { type: 'log', text: '>> [1] PartItems Ready' },
-      { type: 'code', text: 'JobOrder.create("S238006A")' },
-      { type: 'log', text: '>> [2] Job Order Created' },
-      { type: 'code', text: 'SBList.export_dxf("SB_List")' },
-      { type: 'log', text: '>> [3] SB List & CAD EE' },
-      { type: 'code', text: 'ShopDwg.render_2d_3d()' },
-      { type: 'log', text: '>> [4] 2D/3D Drawing Set' },
-      { type: 'log', text: '★ AUTO BOM 100% COMPLETE' }
+      { type: 'comment', text: '# QHeim_AutoBOM Engine v3.2 (20X Pipeline)' },
+      { type: 'keyword', text: 'require "sketchup.rb" ; require "json"' },
+      { type: 'keyword', text: 'module SCGHeim::AutoBOM_Runner' },
+      { type: 'comment', text: '# [STAGE 1] Parse OTF CAD & P-Rules' },
+      { type: 'code', text: '  model = Sketchup.active_model' },
+      { type: 'code', text: '  otf = OTF.parse("Forcon_Floorplan.dwg")' },
+      { type: 'code', text: '  rules = Database.load_p_rules(1..19)' },
+      { type: 'log', text: '  >> [OK] OTF Parsed + 19 P-Rules Ready' },
+      { type: 'comment', text: '# [STAGE 2] Frame Wall C75 ±1mm Tolerance' },
+      { type: 'keyword', text: '  otf.wall_segments.each_with_index do |w, i|' },
+      { type: 'code', text: '    pitch = rules.coding_pitch(:C75, 450)' },
+      { type: 'code', text: '    studs = w.compute_studs(pitch, height: 2800)' },
+      { type: 'code', text: '    grp = model.entities.add_group' },
+      { type: 'code', text: '    grp.extrude_c75_frame!(studs, rules)' },
+      { type: 'code', text: '    grp.attach_smartboard!(layer: :SB_9mm)' },
+      { type: 'log', text: '  >> [3D] C75 Framing & SmartBoard Sync' },
+      { type: 'keyword', text: '  end' },
+      { type: 'comment', text: '# [STAGE 3] Auto CAD EE Conduit & Punch' },
+      { type: 'code', text: '  outlets = otf.extract_mep_points(:EE)' },
+      { type: 'keyword', text: '  outlets.each do |pt|' },
+      { type: 'code', text: '    stud = model.nearest_c75_stud(pt)' },
+      { type: 'code', text: '    stud.punch_slot!(40, 80, offset_z: 300)' },
+      { type: 'code', text: '    BOMRegistry.register_ee_box(pt, "EE-S")' },
+      { type: 'log', text: '  >> [EE] CAD Punching Box @ H+300mm OK' },
+      { type: 'keyword', text: '  end' },
+      { type: 'comment', text: '# [STAGE 4] Parallel Factory Deliverables' },
+      { type: 'code', text: '  bom = AutoBOM.aggregate(model, rules)' },
+      { type: 'code', text: '  bom.export_xlsx!("PartItems_PO.xlsx")' },
+      { type: 'log', text: '  >> [1/4] PartItems Excel Ready (MRP)' },
+      { type: 'code', text: '  JobOrder.generate!("S238006A", bom)' },
+      { type: 'log', text: '  >> [2/4] Job Order Sheet Verified' },
+      { type: 'code', text: '  SBList.export_cnc_dxf!("Lantek_BP.dxf")' },
+      { type: 'log', text: '  >> [3/4] SB List & CNC DXF Exported' },
+      { type: 'code', text: '  ShopDrawing.batch_render_2d_3d!(model)' },
+      { type: 'log', text: '  >> [4/4] 2D Assembly & 3D Views Done' },
+      { type: 'log', text: '  ★ [DONE] STATUS: 100% READY FOR FACTORY' },
+      { type: 'keyword', text: 'end' }
     ];
 
     const totalLines = scriptLines.length;
-    const vdoProg = (vdoTotalSec && vdoTotalSec > 0) ? Math.min(1.0, Math.max(0, vdoElapsed / vdoTotalSec)) : 0;
-    // Progression runs at 20X speed looping throughout entire video duration ("ปรับเป็น รันโค้ต ตลอด ตาม Vdo รัน วิ่ง 20X")
-    const speedMultiplier = 20.0;
-    const cycleDuration = (vdoTotalSec && vdoTotalSec > 0) ? (vdoTotalSec / speedMultiplier) : 6.0;
-    const cycleProg = isRunning ? ((vdoElapsed % cycleDuration) / cycleDuration) : 0.29;
-    const activeLineIdx = Math.min(totalLines - 1, Math.floor(cycleProg * totalLines));
-
-    // Visible lines area
-    const contentY = termY + headH + 4;
-    const contentH = codeH - headH - 26; // leave 22px for status footer
-    const lineH = 20;
-
-    // Auto-scroll offset to keep active line centered
-    let scrollY = 0;
-    if (activeLineIdx > 10) {
-      scrollY = (activeLineIdx - 10) * lineH;
+    // Run 20 full passes over 113s window (00:02 -> 01:55): 5.65s per full pass (~6.5 lines/sec -> crisp 20X live feel)
+    const cycleDuration = runWindow / speedMultiplier;
+    let activeLineFloat = 0;
+    if (phase === 'waiting') {
+      activeLineFloat = 0;
+    } else if (phase === 'done') {
+      activeLineFloat = totalLines - 1;
+    } else {
+      const liveClock = isRunning ? clampedRunElapsed : (clampedRunElapsed + nowSec);
+      const cycleProg = (liveClock % cycleDuration) / cycleDuration;
+      activeLineFloat = cycleProg * totalLines;
     }
+    const activeLineIdx = Math.min(totalLines - 1, Math.floor(activeLineFloat));
 
-    // Clip to content viewport
+    const contentY = subBarY + subBarH + 4;
+    const footerH = 38;
+    const contentH = Math.max(80, codeH - headH - subBarH - footerH - 8);
+    const lineH = 21;
+    const visibleLines = Math.max(6, Math.floor(contentH / lineH));
+    const maxScrollPx = Math.max(0, (totalLines - visibleLines + 1) * lineH);
+    const rawScrollPx = Math.max(0, (activeLineFloat - Math.floor(visibleLines * 0.45)) * lineH);
+    const scrollY = phase === 'waiting' ? 0 : Math.min(maxScrollPx, rawScrollPx);
+
+    // Clip to Code Viewport
     ctx.save();
-    ctx.rect(termX, contentY, codeW, contentH);
+    ctx.rect(termX + 1, contentY, codeW - 2, contentH);
     ctx.clip();
 
-    const cursorBlink = Math.sin(nowSec * 7) > 0;
+    const cursorBlink = Math.sin(nowSec * 9) > 0;
 
     scriptLines.forEach((item, idx) => {
       const ly = contentY + idx * lineH - scrollY;
@@ -4118,81 +4000,95 @@ class PresentationApp {
 
       const isActive = idx === activeLineIdx;
 
-      // Highlight active executing line
       if (isActive) {
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+        ctx.fillStyle = phase === 'done' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(56, 189, 248, 0.20)';
         ctx.fillRect(termX + 2, ly - 1, codeW - 4, lineH);
 
-        ctx.fillStyle = '#38BDF8';
+        ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
         ctx.font = '700 10.5px "JetBrains Mono", monospace';
-        ctx.fillText('▶', termX + 4, ly + 13);
+        ctx.fillText('▶', termX + 6, ly + 14);
       }
 
       // Line number
-      ctx.fillStyle = isActive ? '#94A3B8' : '#475569';
+      ctx.fillStyle = isActive ? '#E2E8F0' : '#475569';
       ctx.font = '500 10.5px "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(String(idx + 1).padStart(2, '0'), termX + 28, ly + 13);
+      ctx.fillText(String(idx + 1).padStart(2, '0'), termX + 34, ly + 14);
       ctx.textAlign = 'left';
 
-      // Divider line
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.5)';
+      // Gutter divider
+      ctx.strokeStyle = 'rgba(51, 65, 85, 0.55)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(termX + 33, ly);
-      ctx.lineTo(termX + 33, ly + lineH);
+      ctx.moveTo(termX + 40, ly);
+      ctx.lineTo(termX + 40, ly + lineH);
       ctx.stroke();
 
-      // Code text by syntax type
-      const tx = termX + 40;
-      const maxTextW = codeW - 48;
-      ctx.font = '500 11px "JetBrains Mono", monospace';
-
+      const tx = termX + 47;
+      const maxTextW = codeW - 58;
       if (item.type === 'comment') {
         ctx.fillStyle = '#64748B';
       } else if (item.type === 'keyword') {
-        ctx.fillStyle = '#F43F5E';
+        ctx.fillStyle = '#FB7185';
       } else if (item.type === 'log') {
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = '700 10.5px "JetBrains Mono", monospace';
+        ctx.fillStyle = item.text.includes('DONE') ? '#34D399' : '#FBBF24';
       } else {
         ctx.fillStyle = isActive ? '#38BDF8' : '#E2E8F0';
       }
 
-      this.fillFittedText(ctx, item.text, tx, ly + 13, maxTextW, 11, item.type === 'log' ? '700' : '500', '"JetBrains Mono", monospace');
+      this.fillFittedText(ctx, item.text, tx, ly + 14, maxTextW, 11.2, item.type === 'log' ? '700' : '500', '"JetBrains Mono", monospace');
 
-      // Blinking cursor on active line
       if (isActive && cursorBlink) {
+        ctx.font = `${item.type === 'log' ? '700' : '500'} 11.2px "JetBrains Mono", monospace`;
         const measured = Math.min(maxTextW, ctx.measureText(item.text).width);
-        ctx.fillStyle = '#38BDF8';
-        ctx.fillRect(tx + measured + 2, ly + 3, 5, 12);
+        ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
+        ctx.fillRect(tx + measured + 3, ly + 3, 6, 13);
       }
     });
 
     ctx.restore();
 
-    // 4. Terminal Bottom Status Bar (Height: 22px)
-    const footY = termY + codeH - 22;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-    ctx.fillRect(termX, footY, codeW, 22);
+    // 4. Console Bottom Status & Progress Bar (0% @ 00:02 -> 100% @ 01:55)
+    const footY = termY + codeH - footerH;
+    ctx.save();
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(termX, footY, codeW, footerH, [0, 0, 10, 10]);
+    else ctx.rect(termX, footY, codeW, footerH);
+    ctx.fillStyle = '#0F172A';
+    ctx.fill();
+    ctx.restore();
 
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.6)';
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(termX, footY);
     ctx.lineTo(termX + codeW, footY);
     ctx.stroke();
 
-    ctx.fillStyle = '#64748B';
-    ctx.font = '500 9.5px "JetBrains Mono", monospace';
-    ctx.fillText(`Ln ${activeLineIdx + 1}, Col 1 • Ruby • API v2.4`, termX + 8, footY + 15);
+    const pctInt = Math.round(windowProg * 100);
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '600 10px "JetBrains Mono", monospace';
+    ctx.fillText(`Ln ${activeLineIdx + 1}/${totalLines} · Ruby 20X · Run: 00:02 → 01:55`, termX + 12, footY + 14);
 
-    // Percentage badge matching media_1794559287293_58bb14c1.jpg
-    const pctStr = `${Math.round(vdoProg * 100)}%`;
-    ctx.fillStyle = '#38BDF8';
+    ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
+    ctx.font = '800 10.5px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(pctStr, termX + codeW - 8, footY + 15);
+    ctx.fillText(`${pctInt}%`, termX + codeW - 12, footY + 14);
     ctx.textAlign = 'left';
+
+    // Smooth Execution Progress Meter
+    const barW = codeW - 24;
+    ctx.fillStyle = '#1E293B';
+    this.roundRect(ctx, termX + 12, footY + 21, barW, 9, 4.5);
+    ctx.fill();
+    if (windowProg > 0.005) {
+      const pGrad = ctx.createLinearGradient(termX + 12, 0, termX + 12 + barW, 0);
+      pGrad.addColorStop(0, '#0284C7');
+      pGrad.addColorStop(1, '#10B981');
+      ctx.fillStyle = pGrad;
+      this.roundRect(ctx, termX + 12, footY + 21, barW * windowProg, 9, 4.5);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
@@ -4357,6 +4253,7 @@ class PresentationApp {
         label: '3D Model',
         sub: 'โมเดลโครงสร้าง 3 มิติ',
         vdo: 'VDO/3D.mp4',
+        thumb: this.factoryDocs ? this.factoryDocs.model3d : null,
         target: 'ฝ่ายวิศวกรรม & โรงงานผลิต',
         process: 'ขึ้นโมเดล 3D C75 ทั้งหลัง < 2 นาที',
         output: '.SKP / IFC (โมเดลกลาง 3 มิติ)',
@@ -4367,6 +4264,7 @@ class PresentationApp {
         label: '2D Drawing',
         sub: 'แบบประกอบ Shop Drawing',
         vdo: 'VDO/2D.mp4',
+        thumb: this.factoryDocs ? this.factoryDocs.drawingAssembly : null,
         target: 'ทีมช่างประกอบ & Assembly Line',
         process: 'แยก Shop Drawing ละเอียด ±1mm',
         output: '.DWG / PDF (Shop Drawing ละเอียด)',
@@ -4377,6 +4275,7 @@ class PresentationApp {
         label: 'Part Items (BOM)',
         sub: 'ถอดปริมาณชิ้นส่วน Auto',
         vdo: 'VDO/BOM.mp4',
+        thumb: this.factoryDocs ? this.factoryDocs.partItems : null,
         target: 'ฝ่ายจัดซื้อ (Purchase) & MRP',
         process: 'ถอดปริมาณชิ้นส่วนอัตโนมัติ 100%',
         output: '.XLSX (BOM Excel ออก PO Auto)',
@@ -4387,6 +4286,7 @@ class PresentationApp {
         label: 'Job Order',
         sub: 'ใบสั่งผลิต & Picking List',
         vdo: 'VDO/Job Order.mp4',
+        thumb: this.factoryDocs ? this.factoryDocs.jobOrder : null,
         target: 'ฝ่ายผลิตโรงงาน (Production)',
         process: 'สร้างใบสั่งผลิตแยกตามแผงผนัง',
         output: '.PDF (Job Order Sheet S238)',
@@ -4397,6 +4297,7 @@ class PresentationApp {
         label: 'SB List & EE',
         sub: 'CAD Punching & CNC',
         vdo: 'VDO/SB List.mp4',
+        thumb: this.factoryDocs ? this.factoryDocs.sbList : null,
         target: 'หน่วยเจาะตัดพับ CNC & Lantek',
         process: 'คำนวณตำแหน่งเจาะท่อไฟ EE Auto',
         output: '.DXF (ส่งตัด CNC & พับ BP)',
@@ -4529,8 +4430,10 @@ class PresentationApp {
           }
         } catch (e) {}
 
-        const canDraw = vid.readyState >= 1 || (vid.videoWidth > 0) || (vid.currentTime > 0);
+        const canDraw = (vid.readyState >= 2) || (vid.videoWidth > 0 && vid.currentTime > 0);
         if (canDraw) {
+          ctx.fillStyle = '#0B0F19';
+          ctx.fillRect(vBoxX, vBoxY, vBoxW, vBoxH);
           this.drawMediaContain(ctx, vid, vid.videoWidth || 1920, vid.videoHeight || 1080, vBoxX, vBoxY, vBoxW, vBoxH);
           vidDrawn = true;
         }
@@ -4539,19 +4442,27 @@ class PresentationApp {
       if (!vidDrawn) {
         ctx.fillStyle = '#0B0F19';
         ctx.fillRect(vBoxX, vBoxY, vBoxW, vBoxH);
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = '600 14px "Prompt", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('🎬 กำลังเชื่อมต่อ ' + item.label + '...', vBoxX + vBoxW / 2, vBoxY + vBoxH / 2);
-        ctx.textAlign = 'left';
+        const fbImg = item.thumb;
+        if (fbImg && fbImg.complete && fbImg.naturalWidth > 0) {
+          this.drawMediaContain(ctx, fbImg, fbImg.naturalWidth, fbImg.naturalHeight, vBoxX, vBoxY, vBoxW, vBoxH);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+          ctx.fillRect(vBoxX, vBoxY, vBoxW, vBoxH);
+        } else {
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = '600 14px "Prompt", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('🎬 กำลังเชื่อมต่อ ' + item.label + '...', vBoxX + vBoxW / 2, vBoxY + vBoxH / 2);
+          ctx.textAlign = 'left';
+        }
       }
 
-      // Live Video Overlay Badge
-      ctx.fillStyle = isAct ? 'rgba(234, 88, 12, 0.92)' : 'rgba(15, 23, 42, 0.78)';
-      this.roundRect(ctx, vBoxX + 10, vBoxY + 10, 78, 24, 6);
+      // Live Video Overlay Badge (shows playing timecode or buffering state)
+      const isLiveReady = vid && ((vid.readyState >= 2) || (vid.videoWidth > 0 && vid.currentTime > 0));
+      ctx.fillStyle = isAct ? 'rgba(234, 88, 12, 0.92)' : (isLiveReady ? 'rgba(5, 150, 105, 0.90)' : 'rgba(15, 23, 42, 0.82)');
+      this.roundRect(ctx, vBoxX + 10, vBoxY + 10, 86, 24, 6);
       ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      this.fillFittedText(ctx, isAct ? '● FOCUS' : '▶ LIVE VDO', vBoxX + 49, vBoxY + 26, 68, 10.5, '800', '"JetBrains Mono", monospace', 'center');
+      this.fillFittedText(ctx, isAct ? '● FOCUS' : (isLiveReady ? '▶ LIVE VDO' : '⏳ BUFFER'), vBoxX + 53, vBoxY + 26, 76, 10.5, '800', '"JetBrains Mono", monospace', 'center');
 
       ctx.restore(); // end video clip
 
@@ -4673,6 +4584,787 @@ class PresentationApp {
         ctx.restore();
       }
     });
+
+    ctx.restore();
+  }
+
+  /**
+   * Metadata catalog for the 5 automated engineering & factory deliverables.
+   */
+  getDeliverablesCatalog() {
+    return [
+      {
+        tag: '3D BIM',
+        ext: '.SKP / .IFC',
+        title: '3D Model',
+        sub: 'โมเดลโครงสร้าง 3 มิติ & พิกัด C75',
+        dept: 'ฝ่ายวิศวกรรม & โรงงานผลิต',
+        proc: 'ขึ้นโมเดล 3D C75 ทั้งหลัง < 2 นาที',
+        proc2: 'ซิงค์ P-Rule & Constraints อัตโนมัติ',
+        outFmt: '.SKP / .IFC',
+        outFmt2: '(โมเดลกลาง 3 มิติ Master BIM)',
+        benefit: 'โมเดลเดียวจบ ไร้ข้อผิดพลาด',
+        benefit2: 'ป้องกันชนโครงสร้าง & ท่อไฟก่อนผลิต',
+        loupeLabel: 'C75 BIM & Insulation Cutaway',
+        loupeFocus: { fx: 0.48, fy: 0.46 },
+        docKey: 'gen01',
+        fallbackKey: 'model3d',
+        accent: '#059669',
+        lightBg: '#ECFDF5',
+        pillBg: '#D1FAE5'
+      },
+      {
+        tag: '2D SHOP',
+        ext: '.DWG / .PDF',
+        title: '2D Drawing',
+        sub: 'แบบประกอบโรงงาน Shop Drawing',
+        dept: 'ทีมช่างประกอบ & Assembly Line',
+        proc: 'แยก Shop Drawing ละเอียด ±1 mm',
+        proc2: 'สร้าง Dimension & Stud Tag ครบทุกแผง',
+        outFmt: '.DWG / .PDF',
+        outFmt2: '(แบบมาตรฐานพร้อมส่งประกอบ)',
+        benefit: 'ประกอบตามแบบได้ทันทีหน้างาน',
+        benefit2: 'ลดเวลาสอบถามหรือรอแก้แบบ 100%',
+        loupeLabel: 'Tolerance ±1mm · Grid & Stud',
+        loupeFocus: { fx: 0.50, fy: 0.45 },
+        docKey: 'gen02',
+        fallbackKey: 'drawingAssembly',
+        accent: '#2563EB',
+        lightBg: '#EFF6FF',
+        pillBg: '#DBEAFE'
+      },
+      {
+        tag: 'BOM / MRP',
+        ext: '.XLSX / PO',
+        title: 'Part Items (BOM)',
+        sub: 'ถอดปริมาณชิ้นส่วน Auto 100%',
+        dept: 'ฝ่ายจัดซื้อ (Purchase) & MRP',
+        proc: 'ถอดปริมาณเหล็ก-บอร์ด-น็อต อัตโนมัติ',
+        proc2: 'สรุปรวมน้ำหนัก/จำนวนพร้อมออก PO',
+        outFmt: '.XLSX (BOM)',
+        outFmt2: '(ตาราง BOM พร้อมส่งสั่งซื้อทันที)',
+        benefit: 'จัดซื้อวัสดุรวดเร็ว ไม่รอเช็คซ้ำ',
+        benefit2: 'ตัดโอกาสสั่งขาด-สั่งเกินหน้างาน',
+        loupeLabel: 'Auto BOM & Purchase Approval',
+        loupeFocus: { fx: 0.68, fy: 0.44 },
+        docKey: 'gen03',
+        fallbackKey: 'partItems',
+        accent: '#0284C7',
+        lightBg: '#F0F9FF',
+        pillBg: '#E0F2FE'
+      },
+      {
+        tag: 'JOB ORDER',
+        ext: '.PDF S230',
+        title: 'Job Order',
+        sub: 'ใบสั่งผลิต & Picking List แยกแผง',
+        dept: 'ฝ่ายผลิตโรงงาน (Production)',
+        proc: 'สร้างใบสั่งผลิตแยกตามหมายเลขแผง',
+        proc2: 'ผูก Barcode/QR เบิกจ่ายชิ้นส่วนตรงแผง',
+        outFmt: '.PDF (S230)',
+        outFmt2: '(Job Order Sheet & Picking Tag)',
+        benefit: 'คุมสต็อกและการหยิบประกอบเป๊ะ',
+        benefit2: 'ตรวจเช็คสถานะรายแผงได้ Real-Time',
+        loupeLabel: 'Panel #101–105 · Barcode / QR',
+        loupeFocus: { fx: 0.54, fy: 0.52 },
+        docKey: 'gen04',
+        fallbackKey: 'jobOrder',
+        accent: '#D97706',
+        lightBg: '#FFFBEB',
+        pillBg: '#FEF3C7'
+      },
+      {
+        tag: 'SB & CNC',
+        ext: '.DXF / CAM',
+        title: 'SB List & EE',
+        sub: 'CAD EE Punching & เจาะตัดพับ CNC',
+        dept: 'หน่วยเจาะตัดพับ CNC & Lantek',
+        proc: 'คำนวณจุดเจาะปลั๊ก & ท่อไฟ EE Auto',
+        proc2: 'Nesting แผ่น Smart Board ส่งเครื่องตัด',
+        outFmt: '.DXF / .CNC',
+        outFmt2: '(ส่งเข้าเครื่องตัดพับ BP & Lantek)',
+        benefit: 'เจาะรูปลั๊กตรงตำแหน่งไฟ 100%',
+        benefit2: 'ลดเศษเหลือตัด & เวลาคีย์ CAM ที่หน้าเครื่อง',
+        loupeLabel: 'CNC Nesting & Conduit Punching',
+        loupeFocus: { fx: 0.52, fy: 0.42 },
+        docKey: 'gen05',
+        fallbackKey: 'sbList',
+        accent: '#7C3AED',
+        lightBg: '#F5F3FF',
+        pillBg: '#EDE9FE'
+      }
+    ];
+  }
+
+  /**
+   * Resolve ready image asset with fallback to factory documentation bitmap.
+   */
+  resolveDeliverableImage(item) {
+    if (!this.factoryDocs) return null;
+    const isReady = (im) => Boolean(im && im.complete && (im.naturalWidth || 0) > 0 && (im.naturalHeight || 0) > 0);
+    const primary = item ? this.factoryDocs[item.docKey] : null;
+    if (isReady(primary)) return primary;
+    const fallback = item ? this.factoryDocs[item.fallbackKey] : null;
+    if (isReady(fallback)) return fallback;
+    return null;
+  }
+
+  /**
+   * Draw an image fitted inside a rounded rectangle with smooth zoom/pan framing.
+   * Returns computed draw rect for loupe sampling.
+   */
+  drawFittedRoundedImage(ctx, img, x, y, w, h, radius, zoom = 1.0, panX = 0, panY = 0, accent = '#059669') {
+    ctx.save();
+    this.roundRect(ctx, x, y, w, h, radius);
+    if (typeof ctx.clip === 'function') ctx.clip();
+
+    ctx.fillStyle = '#0F172A';
+    ctx.fillRect(x, y, w, h);
+
+    let drawRect = { dx: x, dy: y, dw: w, dh: h };
+    if (img && typeof ctx.drawImage === 'function') {
+      const iw = img.naturalWidth || w;
+      const ih = img.naturalHeight || h;
+      const baseScale = Math.max(w / iw, h / ih);
+      const dw = iw * baseScale * zoom;
+      const dh = ih * baseScale * zoom;
+      const dx = x + (w - dw) / 2 + panX;
+      const dy = y + (h - dh) / 2 + panY;
+      ctx.drawImage(img, dx, dy, dw, dh);
+      drawRect = { dx, dy, dw, dh };
+    } else {
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = accent;
+      ctx.font = '700 16px "Prompt", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('LOADING GENERATED VISUAL...', x + w / 2, y + h / 2);
+    }
+    ctx.restore();
+    return drawRect;
+  }
+
+  /**
+   * Render animated floating 2x magnifying loupe gliding over key detail points.
+   */
+  drawMagnifyingLoupe(ctx, img, viewBox, imgRect, focus, nowSec, accent, label) {
+    if (!img || typeof ctx.drawImage !== 'function' || typeof ctx.arc !== 'function' || typeof ctx.clip !== 'function') {
+      return;
+    }
+    const orbitX = Math.sin(nowSec * 0.85) * 0.065;
+    const orbitY = Math.cos(nowSec * 0.65) * 0.055;
+    const normX = Math.max(0.18, Math.min(0.82, focus.fx + orbitX));
+    const normY = Math.max(0.22, Math.min(0.78, focus.fy + orbitY));
+
+    const r = 64;
+    const lx = viewBox.x + normX * viewBox.w;
+    const ly = viewBox.y + normY * viewBox.h;
+
+    const iw = img.naturalWidth || viewBox.w;
+    const ih = img.naturalHeight || viewBox.h;
+    const relX = (lx - imgRect.dx) / (imgRect.dw || viewBox.w);
+    const relY = (ly - imgRect.dy) / (imgRect.dh || viewBox.h);
+    const zoomFactor = 2.05;
+    const srcW = (r * 2 / (imgRect.dw || viewBox.w)) * iw / zoomFactor;
+    const srcH = (r * 2 / (imgRect.dh || viewBox.h)) * ih / zoomFactor;
+    const srcX = Math.max(0, Math.min(iw - srcW, relX * iw - srcW / 2));
+    const srcY = Math.max(0, Math.min(ih - srcH, relY * ih - srcH / 2));
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.38)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = '#0F172A';
+    ctx.beginPath();
+    ctx.arc(lx, ly, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx, ly, r - 3, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, lx - r + 3, ly - r + 3, (r - 3) * 2, (r - 3) * 2);
+
+    // Subtle magnifying glass specular sheen & crosshair reticle
+    const sheen = ctx.createLinearGradient(lx - r, ly - r, lx + r, ly + r);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.22)');
+    sheen.addColorStop(0.45, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(lx - r, ly - r, r * 2, r * 2);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(lx - 14, ly);
+    ctx.lineTo(lx + 14, ly);
+    ctx.moveTo(lx, ly - 14);
+    ctx.lineTo(lx, ly + 14);
+    ctx.stroke();
+    ctx.restore();
+
+    // Glowing double lens bezel
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.arc(lx, ly, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.arc(lx, ly, r + 3, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Smart callout label flipping away from Hero boundaries
+    const badgeW = 248;
+    const badgeH = 32;
+    const placeLeft = lx > viewBox.x + viewBox.w * 0.56;
+    const bx = placeLeft ? (lx - r - badgeW - 12) : (lx + r + 12);
+    const by = Math.max(viewBox.y + 12, Math.min(viewBox.y + viewBox.h - badgeH - 12, ly - badgeH / 2));
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    this.roundRect(ctx, bx, by, badgeW, badgeH, 8);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, `🔍 2×  ${label}`, bx + badgeW / 2, by + 20, badgeW - 16, 12.5, '700', '"Prompt", sans-serif', 'center');
+    ctx.restore();
+  }
+
+  /**
+   * Draw full-screen Cinema Modal when user clicks 'ขยายเต็มจอ' or Hero image.
+   */
+  drawDeliverablesModal(ctx, box, items, activeIdx) {
+    const d = items[activeIdx];
+    const img = this.resolveDeliverableImage(d);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+
+    const mx = box.x + 24;
+    const my = box.y + 14;
+    const mw = box.w - 48;
+    const mh = box.h - 28;
+    this.automationModalBox = { x: mx, y: my, w: mw, h: mh };
+
+    ctx.fillStyle = '#0F172A';
+    this.roundRect(ctx, mx, my, mw, mh, 24);
+    ctx.fill();
+    ctx.strokeStyle = d.accent;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Header
+    ctx.fillStyle = d.accent;
+    this.roundRect(ctx, mx + 28, my + 24, 152, 34, 9);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, `OUTPUT 0${activeIdx + 1} / 05`, mx + 104, my + 46, 136, 14, '900', '"Prompt", sans-serif', 'center');
+
+    ctx.fillStyle = '#F8FAFC';
+    this.fillFittedText(ctx, `${d.title} — ${d.sub}`, mx + 200, my + 47, 1080, 24, '900', '"Prompt", sans-serif', 'left');
+
+    // Close button
+    const closeW = 148;
+    const closeH = 42;
+    const closeX = mx + mw - closeW - 26;
+    const closeY = my + 20;
+    this.automationModalCloseBtn = { x: closeX, y: closeY, w: closeW, h: closeH };
+    ctx.fillStyle = '#EF4444';
+    this.roundRect(ctx, closeX, closeY, closeW, closeH, 10);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, '✕ ปิด (ESC)', closeX + closeW / 2, closeY + 26, closeW - 16, 14, '800', '"Prompt", sans-serif', 'center');
+
+    // Cinema Visual
+    this.drawFittedRoundedImage(ctx, img, mx + 28, my + 76, mw - 56, mh - 180, 16, 1.0, 0, 0, d.accent);
+
+    // Bottom Summary Strip
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    this.roundRect(ctx, mx + 28, my + mh - 86, mw - 56, 62, 12);
+    ctx.fill();
+    ctx.fillStyle = '#CBD5E1';
+    this.fillFittedText(ctx, `🏢 ${d.dept}   |   ⚡ ${d.proc}   |   📁 ${d.outFmt}   |   ✨ ${d.benefit}`, mx + mw / 2, my + mh - 48, mw - 100, 17, '700', '"Prompt", sans-serif', 'center');
+    ctx.restore();
+  }
+
+  /**
+   * Slide 12 Tab 03: Interactive Master-Detail Showcase of all 5 Generated Deliverables.
+   * Alternates cleanly across 01..05 showing both the BIG spotlight inspection view & 5 small cards.
+   */
+  drawDeliverablesShowcaseScene(ctx, box, slide, animSec, nowSec) {
+    ctx.save();
+    const tSec = nowSec || (Date.now() / 1000);
+    const items = this.getDeliverablesCatalog();
+    const dwellSec = 4.0; // Exact 4.0s x 5 deliverables = 20.0s full showcase
+
+    if (this._deliverablesCycleOrigin === undefined) {
+      this._deliverablesCycleOrigin = tSec;
+    }
+
+    const isAuto = (this.automationActiveTab === null || this.automationActiveTab === undefined);
+    let activeIdx = 0;
+    let cycleProg = 1.0;
+
+    if (isAuto) {
+      const elapsed = (this.isPlaying && typeof animSec === 'number' && animSec >= 0)
+        ? animSec
+        : Math.max(0, tSec - this._deliverablesCycleOrigin);
+      const totalPos = (elapsed / dwellSec) % items.length;
+      activeIdx = Math.floor(totalPos);
+      cycleProg = totalPos - activeIdx;
+    } else {
+      activeIdx = Math.max(0, Math.min(items.length - 1, this.automationActiveTab));
+      this._deliverablesCycleOrigin = tSec - activeIdx * dwellSec;
+    }
+
+    if (this._lastRenderedDeliverable !== activeIdx) {
+      this._lastRenderedDeliverable = activeIdx;
+      this._deliverableSwitchAt = tSec;
+    }
+    const transElapsed = Math.min(1, Math.max(0, (tSec - (this._deliverableSwitchAt || 0)) / 0.42));
+    const easeOut = 1 - Math.pow(1 - transElapsed, 3);
+
+    const dActive = items[activeIdx];
+    const activeImg = this.resolveDeliverableImage(dActive);
+
+    // 1. Main Clean White Studio Card + Dot Blueprint Texture
+    const cardX = box.x + 10;
+    const cardY = box.y + 6;
+    const cardW = box.w - 20;
+    const cardH = box.h - 12;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+    this.roundRect(ctx, cardX, cardY, cardW, cardH, 20);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Dotted blueprint texture inside card
+    if (typeof ctx.arc === 'function') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.032)';
+      for (let gx = cardX + 28; gx < cardX + cardW - 18; gx += 34) {
+        for (let gy = cardY + 76; gy < cardY + cardH - 18; gy += 34) {
+          ctx.beginPath();
+          ctx.arc(gx, gy, 1.15, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // 2. Top SCG HEIM Dark Emerald Banner + Auto/Step Pills (clipped inside outer card radius)
+    const bannerH = 56;
+    ctx.save();
+    this.roundRect(ctx, cardX, cardY, cardW, cardH, 20);
+    if (typeof ctx.clip === 'function') ctx.clip();
+    const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
+    bGrad.addColorStop(0, '#0B1F1B');
+    bGrad.addColorStop(0.55, '#064E3B');
+    bGrad.addColorStop(1, '#0F172A');
+    ctx.fillStyle = bGrad;
+    ctx.fillRect(cardX, cardY, cardW, bannerH);
+    ctx.restore();
+
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(
+      ctx,
+      '🖼️  AUTOMATION OUTPUT SHOWCASE — 5 ผลผลิตหลักอัตโนมัติ (Generated Visual · ซูมดูครบ 5 ใบ)',
+      cardX + 26,
+      cardY + 35,
+      1020,
+      18,
+      '900',
+      '"Prompt", sans-serif',
+      'left'
+    );
+
+    this.automationControls = [];
+    this.automationCards = [];
+    this.automationModalCloseBtn = null;
+    this.automationModalBox = null;
+
+    // Auto / Pinned Cycle Toggle Pill
+    const autoBtnW = 246;
+    const autoBtnH = 34;
+    const autoBtnX = cardX + cardW - autoBtnW - 22;
+    const autoBtnY = cardY + 11;
+    this.automationControls.push({ action: 'toggle-auto', x: autoBtnX, y: autoBtnY, w: autoBtnW, h: autoBtnH });
+
+    ctx.fillStyle = isAuto ? '#059669' : '#D97706';
+    this.roundRect(ctx, autoBtnX, autoBtnY, autoBtnW, autoBtnH, 17);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    const remainSec = Math.max(0.1, (1 - cycleProg) * dwellSec).toFixed(1);
+    const totalCycleSec = Math.round(dwellSec * items.length);
+    const autoLbl = isAuto ? `▶ AUTO 1→5 (${totalCycleSec}s · ${remainSec}s)` : `📌 PINNED #0${activeIdx + 1} · กดวน ${totalCycleSec}s`;
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, autoLbl, autoBtnX + autoBtnW / 2, autoBtnY + 22, autoBtnW - 18, 13, '800', '"Prompt", sans-serif', 'center');
+
+    // Banner 01..05 Quick Step Badges
+    const dotW = 42;
+    const dotGap = 6;
+    const dotsTotalW = items.length * dotW + (items.length - 1) * dotGap;
+    const dotsStartX = autoBtnX - dotsTotalW - 16;
+    items.forEach((it, idx) => {
+      const dx = dotsStartX + idx * (dotW + dotGap);
+      const dy = cardY + 12;
+      const isCur = idx === activeIdx;
+      this.automationControls.push({ action: 'select', idx, x: dx, y: dy, w: dotW, h: 32 });
+      ctx.fillStyle = isCur ? it.accent : 'rgba(255,255,255,0.12)';
+      this.roundRect(ctx, dx, dy, dotW, 32, 8);
+      ctx.fill();
+      if (isCur) {
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.fillStyle = isCur ? '#FFFFFF' : '#CBD5E1';
+      this.fillFittedText(ctx, `0${idx + 1}`, dx + dotW / 2, dy + 21, dotW - 8, 13, '800', '"Prompt", sans-serif', 'center');
+    });
+
+    // 3. Asymmetric Split Geometry: Left BIG Hero + Right 5 Small Cards
+    const padX = 22;
+    const bodyX = cardX + padX;
+    const bodyY = cardY + bannerH + 16;
+    const bodyW = cardW - padX * 2;
+    const bodyH = cardH - bannerH - 32;
+
+    const gapCols = 34;
+    const heroW = 1110;
+    const smallColW = bodyW - heroW - gapCols;
+    const smallColX = bodyX + heroW + gapCols;
+
+    // ---------------- LEFT COLUMN: BIG HERO SPOTLIGHT ----------------
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
+    this.roundRect(ctx, bodyX, bodyY, heroW, bodyH, 18);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = dActive.accent;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // Subtle Hero Header Tint (clipped cleanly inside Hero top radius)
+    ctx.save();
+    this.roundRect(ctx, bodyX + 1, bodyY + 1, heroW - 2, bodyH - 2, 17);
+    if (typeof ctx.clip === 'function') ctx.clip();
+    const hhGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX + heroW, bodyY + 76);
+    hhGrad.addColorStop(0, dActive.lightBg);
+    hhGrad.addColorStop(1, '#FFFFFF');
+    ctx.fillStyle = hhGrad;
+    ctx.fillRect(bodyX + 1, bodyY + 1, heroW - 2, 74);
+    ctx.restore();
+
+    // Hero Output Pill & Title
+    ctx.fillStyle = dActive.accent;
+    this.roundRect(ctx, bodyX + 20, bodyY + 16, 150, 32, 8);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, `OUTPUT 0${activeIdx + 1} / 05`, bodyX + 95, bodyY + 37, 138, 13.5, '900', '"Prompt", sans-serif', 'center');
+
+    ctx.fillStyle = '#0F172A';
+    this.fillFittedText(ctx, `${dActive.title} — ${dActive.sub}`, bodyX + 184, bodyY + 34, 620, 22, '900', '"Prompt", sans-serif', 'left');
+    ctx.fillStyle = '#475569';
+    this.fillFittedText(ctx, `${dActive.tag}  ·  ${dActive.outFmt}  ·  คลิกภาพด้านล่างเพื่อซูม 1920×1080`, bodyX + 184, bodyY + 57, 620, 13, '600', '"Prompt", sans-serif', 'left');
+
+    // Hero Controls: Prev / Next / Fullscreen Modal
+    const modalBtnW = 144;
+    const navBtnW = 42;
+    const ctrlY = bodyY + 19;
+    const modalBtnX = bodyX + heroW - modalBtnW - 20;
+    const nextBtnX = modalBtnX - navBtnW - 8;
+    const prevBtnX = nextBtnX - navBtnW - 8;
+
+    this.automationControls.push({ action: 'prev', x: prevBtnX, y: ctrlY, w: navBtnW, h: 36 });
+    this.automationControls.push({ action: 'next', x: nextBtnX, y: ctrlY, w: navBtnW, h: 36 });
+    this.automationControls.push({ action: 'modal', x: modalBtnX, y: ctrlY, w: modalBtnW, h: 36 });
+
+    [[prevBtnX, '◀'], [nextBtnX, '▶']].forEach(([bx, sym]) => {
+      ctx.fillStyle = '#FFFFFF';
+      this.roundRect(ctx, bx, ctrlY, navBtnW, 36, 9);
+      ctx.fill();
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.fillStyle = '#0F172A';
+      this.fillFittedText(ctx, sym, bx + navBtnW / 2, ctrlY + 23, 28, 14, '900', 'sans-serif', 'center');
+    });
+
+    ctx.fillStyle = dActive.accent;
+    this.roundRect(ctx, modalBtnX, ctrlY, modalBtnW, 36, 9);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, '🔍 ขยายเต็มจอ', modalBtnX + modalBtnW / 2, ctrlY + 23, modalBtnW - 14, 13, '800', '"Prompt", sans-serif', 'center');
+
+    // Hero Large 16:9 Generated Visual Viewport
+    const imgPadX = 18;
+    const heroImgX = bodyX + imgPadX;
+    const heroImgY = bodyY + 80;
+    const heroImgW = heroW - imgPadX * 2;
+    const heroImgH = 582;
+
+    this.automationDocBox = { x: heroImgX, y: heroImgY, w: heroImgW, h: heroImgH };
+
+    const slideOffset = (1 - easeOut) * 18;
+    const kbZoom = 1.025 + 0.025 * Math.sin(tSec * 0.72) + (1 - easeOut) * 0.03;
+    const kbPanX = Math.sin(tSec * 0.45) * 8 + slideOffset;
+    const kbPanY = Math.cos(tSec * 0.38) * 6;
+
+    const imgRect = this.drawFittedRoundedImage(ctx, activeImg, heroImgX, heroImgY, heroImgW, heroImgH, 14, kbZoom, kbPanX, kbPanY, dActive.accent);
+
+    // Subtle Blueprint Sweep Line across Generated Visual
+    ctx.save();
+    this.roundRect(ctx, heroImgX, heroImgY, heroImgW, heroImgH, 14);
+    if (typeof ctx.clip === 'function') ctx.clip();
+    const scanY = heroImgY + ((tSec * 0.24) % 1) * heroImgH;
+    const sGrad = ctx.createLinearGradient(heroImgX, scanY - 24, heroImgX, scanY + 24);
+    sGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    sGrad.addColorStop(0.5, dActive.accent + '33');
+    sGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sGrad;
+    ctx.fillRect(heroImgX, scanY - 24, heroImgW, 48);
+    ctx.restore();
+
+    // Precision 4-Corner Brackets around Hero Viewport
+    ctx.strokeStyle = dActive.accent;
+    ctx.lineWidth = 2.4;
+    const brLen = 22;
+    [
+      [heroImgX + 8, heroImgY + 8, 1, 1],
+      [heroImgX + heroImgW - 8, heroImgY + 8, -1, 1],
+      [heroImgX + 8, heroImgY + heroImgH - 8, 1, -1],
+      [heroImgX + heroImgW - 8, heroImgY + heroImgH - 8, -1, -1]
+    ].forEach(([cx, cy, sx, sy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + sy * brLen);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx + sx * brLen, cy);
+      ctx.stroke();
+    });
+
+    // Interactive Floating 2x Magnifying Loupe
+    this.drawMagnifyingLoupe(
+      ctx,
+      activeImg,
+      { x: heroImgX, y: heroImgY, w: heroImgW, h: heroImgH },
+      imgRect,
+      dActive.loupeFocus,
+      tSec,
+      dActive.accent,
+      dActive.loupeLabel
+    );
+
+    // Top-Left Generated Visual Live Tag Pill
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.80)';
+    this.roundRect(ctx, heroImgX + 18, heroImgY + 18, 224, 30, 8);
+    ctx.fill();
+    ctx.fillStyle = '#34D399';
+    this.fillFittedText(ctx, `✨ GENERATED #0${activeIdx + 1} · 16:9 HD`, heroImgX + 130, heroImgY + 38, 206, 12.5, '800', '"Prompt", sans-serif', 'center');
+
+    // Hero Bottom 4 Structured Specification Cards
+    const specY = heroImgY + heroImgH + 14;
+    const specH = bodyY + bodyH - specY - 22;
+    const specGap = 12;
+    const specW = (heroImgW - specGap * 3) / 4;
+
+    const specs = [
+      { hdr: '🏢 แผนกปลายทาง', line1: dActive.dept, line2: 'รับข้อมูลตรงจากระบบกลาง', hl: false },
+      { hdr: '⚡ การประมวลผลอัตโนมัติ', line1: dActive.proc, line2: dActive.proc2, hl: false },
+      { hdr: '📁 รูปแบบไฟล์ผลผลิต', line1: dActive.outFmt, line2: dActive.outFmt2, hl: false },
+      { hdr: '✨ จุดเด่น & Value', line1: dActive.benefit, line2: dActive.benefit2, hl: true }
+    ];
+
+    specs.forEach((sp, si) => {
+      const sx = heroImgX + si * (specW + specGap);
+      ctx.fillStyle = sp.hl ? dActive.lightBg : '#F8FAFC';
+      this.roundRect(ctx, sx, specY, specW, specH, 12);
+      ctx.fill();
+      ctx.strokeStyle = sp.hl ? dActive.accent : '#E2E8F0';
+      ctx.lineWidth = sp.hl ? 1.8 : 1.2;
+      ctx.stroke();
+
+      // Accent top bar inside spec card
+      ctx.fillStyle = sp.hl ? dActive.accent : '#CBD5E1';
+      this.roundRect(ctx, sx + 14, specY + 14, 48, 4, 2);
+      ctx.fill();
+
+      ctx.fillStyle = sp.hl ? dActive.accent : '#64748B';
+      this.fillFittedText(ctx, sp.hdr, sx + 14, specY + 46, specW - 24, 13.5, '800', '"Prompt", sans-serif', 'left');
+
+      ctx.fillStyle = '#0F172A';
+      this.fillFittedText(ctx, sp.line1, sx + 14, specY + 86, specW - 24, 16, '900', '"Prompt", sans-serif', 'left');
+
+      ctx.fillStyle = '#475569';
+      this.fillFittedText(ctx, sp.line2, sx + 14, specY + 118, specW - 24, 13, '600', '"Prompt", sans-serif', 'left');
+    });
+
+    // Bottom Auto-Cycle Progress Bar inside Hero Card
+    const pBarX = heroImgX;
+    const pBarY = bodyY + bodyH - 12;
+    ctx.fillStyle = '#E2E8F0';
+    this.roundRect(ctx, pBarX, pBarY, heroImgW, 5, 2.5);
+    ctx.fill();
+    ctx.fillStyle = dActive.accent;
+    this.roundRect(ctx, pBarX, pBarY, Math.max(10, heroImgW * (isAuto ? cycleProg : 1)), 5, 2.5);
+    ctx.fill();
+    ctx.restore();
+
+    // ---------------- RIGHT COLUMN: 5 SMALL INTERACTIVE THUMBNAIL CARDS ----------------
+    const smallGap = 12;
+    const smallH = (bodyH - smallGap * (items.length - 1)) / items.length;
+    let activeConnectorStartY = bodyY + smallH / 2;
+
+    items.forEach((it, idx) => {
+      const isFocused = idx === activeIdx;
+      const isHovered = this.hoveredCard === ('auto_card_' + idx);
+      const sx = smallColX - (isFocused ? 8 : 0);
+      const sy = bodyY + idx * (smallH + smallGap);
+      const sw = smallColW + (isFocused ? 8 : 0);
+
+      if (isFocused) {
+        activeConnectorStartY = sy + smallH / 2;
+      }
+
+      this.automationCards.push({ id: 'auto_card_' + idx, idx, x: sx, y: sy, w: sw, h: smallH });
+
+      ctx.save();
+      ctx.fillStyle = isFocused ? it.lightBg : (isHovered ? '#F8FAFC' : '#FFFFFF');
+      ctx.shadowColor = isFocused ? 'rgba(15, 23, 42, 0.14)' : 'rgba(15, 23, 42, 0.04)';
+      ctx.shadowBlur = isFocused ? 18 : 8;
+      ctx.shadowOffsetY = isFocused ? 6 : 2;
+      this.roundRect(ctx, sx, sy, sw, smallH, 14);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      ctx.strokeStyle = isFocused ? it.accent : (isHovered ? it.accent : '#CBD5E1');
+      ctx.lineWidth = isFocused ? 2.6 : (isHovered ? 1.8 : 1.2);
+      ctx.stroke();
+
+      // Left Miniature 16:9 Thumbnail of Generated Image
+      const thumbW = 242;
+      const thumbH = smallH - 24;
+      const thumbX = sx + 12;
+      const thumbY = sy + 12;
+      const thumbImg = this.resolveDeliverableImage(it);
+      this.drawFittedRoundedImage(ctx, thumbImg, thumbX, thumbY, thumbW, thumbH, 10, isFocused ? 1.04 : 1.0, 0, 0, it.accent);
+
+      // Border + Number Badge on Thumbnail
+      ctx.strokeStyle = isFocused ? it.accent : '#CBD5E1';
+      ctx.lineWidth = 1.4;
+      this.roundRect(ctx, thumbX, thumbY, thumbW, thumbH, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = isFocused ? it.accent : 'rgba(15, 23, 42, 0.80)';
+      this.roundRect(ctx, thumbX + 8, thumbY + 8, 42, 24, 6);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      this.fillFittedText(ctx, `0${idx + 1}`, thumbX + 29, thumbY + 24, 34, 12.5, '900', '"Prompt", sans-serif', 'center');
+
+      // Right Metadata inside Small Card
+      const infoX = thumbX + thumbW + 14;
+      const infoW = sw - thumbW - 38;
+
+      ctx.fillStyle = it.accent;
+      this.roundRect(ctx, infoX, sy + 16, 88, 22, 6);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      this.fillFittedText(ctx, `OUTPUT 0${idx + 1}`, infoX + 44, sy + 31, 80, 11, '800', '"Prompt", sans-serif', 'center');
+
+      ctx.fillStyle = '#E2E8F0';
+      this.roundRect(ctx, infoX + 94, sy + 16, 94, 22, 6);
+      ctx.fill();
+      ctx.fillStyle = '#334155';
+      this.fillFittedText(ctx, it.ext, infoX + 141, sy + 31, 84, 11, '800', 'monospace', 'center');
+
+      if (isFocused) {
+        ctx.fillStyle = '#0F172A';
+        this.roundRect(ctx, infoX + infoW - 96, sy + 15, 96, 23, 6);
+        ctx.fill();
+        ctx.fillStyle = '#34D399';
+        this.fillFittedText(ctx, '◀ ภาพใหญ่', infoX + infoW - 48, sy + 31, 88, 11, '800', '"Prompt", sans-serif', 'center');
+      }
+
+      ctx.fillStyle = '#0F172A';
+      this.fillFittedText(ctx, it.title, infoX, sy + 64, infoW, 19, '900', '"Prompt", sans-serif', 'left');
+
+      ctx.fillStyle = '#475569';
+      this.fillFittedText(ctx, it.sub, infoX, sy + 88, infoW, 13, '600', '"Prompt", sans-serif', 'left');
+
+      ctx.fillStyle = '#1E293B';
+      this.fillFittedText(ctx, `🏢 ${it.dept}`, infoX, sy + 114, infoW, 12.5, '700', '"Prompt", sans-serif', 'left');
+
+      // Bottom Live Progress / Hover Prompt Strip inside Small Card
+      const barY = sy + smallH - 22;
+      if (isFocused) {
+        ctx.fillStyle = it.pillBg;
+        this.roundRect(ctx, infoX, barY, infoW, 8, 4);
+        ctx.fill();
+        ctx.fillStyle = it.accent;
+        this.roundRect(ctx, infoX, barY, Math.max(12, infoW * (isAuto ? cycleProg : 1)), 8, 4);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = isHovered ? it.accent : '#64748B';
+        this.fillFittedText(ctx, 'คลิกเพื่อสลับขึ้นภาพใหญ่ด้านซ้าย ◀', infoX, barY + 6, infoW, 11.5, '700', '"Prompt", sans-serif', 'left');
+      }
+      ctx.restore();
+    });
+
+    // ---------------- GLOWING CONNECTOR BRIDGE (ACTIVE SMALL CARD -> BIG HERO) ----------------
+    const bridgeStartX = smallColX - 8;
+    const bridgeEndX = bodyX + heroW + 2;
+    const bridgeEndY = heroImgY + heroImgH * 0.5;
+    const midX = (bridgeStartX + bridgeEndX) / 2;
+
+    ctx.save();
+    ctx.strokeStyle = dActive.accent;
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.moveTo(bridgeStartX, activeConnectorStartY);
+    if (typeof ctx.bezierCurveTo === 'function') {
+      ctx.bezierCurveTo(midX, activeConnectorStartY, midX, bridgeEndY, bridgeEndX, bridgeEndY);
+    } else {
+      ctx.lineTo(bridgeEndX, bridgeEndY);
+    }
+    ctx.stroke();
+
+    if (typeof ctx.arc === 'function') {
+      const pulse = 5 + 2.5 * Math.sin(tSec * 5);
+      ctx.fillStyle = dActive.accent;
+      ctx.beginPath();
+      ctx.arc(bridgeEndX, bridgeEndY, pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(bridgeStartX, activeConnectorStartY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = dActive.accent;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 4. Optional Cinema Fullscreen Modal
+    if (this.showAutomationModal) {
+      this.drawDeliverablesModal(ctx, box, items, activeIdx);
+    }
 
     ctx.restore();
   }
@@ -5270,7 +5962,7 @@ class PresentationApp {
 
     drawCleanPipe([{ x: box.x + 755, y: bY3 }, { x: box.x + 800, y: bY3 }], '#F58245', true, 1.3);
 
-    // ★ CAD EE Puning Mint Box
+    // ★ CAD EE Punching Mint Box
     ctx.fillStyle = '#84D3BD';
     this.roundRect(ctx, box.x + 800, bY3 - 34, 210, 68, 20);
     ctx.fill();
@@ -5280,7 +5972,7 @@ class PresentationApp {
     ctx.fillStyle = '#5933A9';
     this.fillFittedText(ctx, '★ AUTOMATED', box.x + 905, bY3 - 10, 190, 14, '800', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = '#111827';
-    this.fillFittedText(ctx, 'CAD EE Puning', box.x + 905, bY3 + 17, 195, 20, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, 'CAD EE Punching', box.x + 905, bY3 + 17, 195, 20, '800', '"Prompt", sans-serif', 'center');
 
     drawCleanPipe([{ x: box.x + 1010, y: bY3 }, { x: box.x + 1060, y: bY3 }], '#84D3BD', true, 1.5);
 
@@ -5288,7 +5980,7 @@ class PresentationApp {
     this.roundRect(ctx, box.x + 1060, bY3 - 27, 115, 54, 27);
     ctx.fill();
     ctx.fillStyle = '#111827';
-    this.fillFittedText(ctx, 'Lantex', box.x + 1117, bY3 + 8, 100, 19, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, 'Lantek', box.x + 1117, bY3 + 8, 100, 19, '800', '"Prompt", sans-serif', 'center');
 
     drawCleanPipe([{ x: box.x + 1175, y: bY3 }, { x: box.x + 1225, y: bY3 }], '#F58245', true, 1.3);
 
@@ -8884,13 +9576,14 @@ class PresentationApp {
           }
         }
 
-        // Slide 4: Automation Deliverables Summary (5 Deliverable Cards + Reference Document Viewer)
-        if (slide.sceneType === 'automation-deliverables-summary') {
+        // Slide 4 / Slide 12 Tab 03: Automation Deliverables Showcase
+        if (slide.sceneType === 'automation-deliverables-summary' || ((slide.layout === 'new-workflow-allinone' || slide.id === 'v3-new-workflow' || slide.sceneType === 'new-workflow-allinone') && this._ver2ActiveStep === 2)) {
           if (this.showAutomationModal) {
             if (this.automationModalCloseBtn) {
               const cb = this.automationModalCloseBtn;
               if (mx >= cb.x && mx <= cb.x + cb.w && my >= cb.y && my <= cb.y + cb.h) {
                 this.showAutomationModal = false;
+                if (!this.isPlaying && typeof this.render === 'function') this.render();
                 return;
               }
             }
@@ -8898,16 +9591,42 @@ class PresentationApp {
               const mb = this.automationModalBox;
               if (mx < mb.x || mx > mb.x + mb.w || my < mb.y || my > mb.y + mb.h) {
                 this.showAutomationModal = false;
+                if (!this.isPlaying && typeof this.render === 'function') this.render();
                 return;
               }
             }
             return;
           }
 
+          if (this.automationControls) {
+            for (const ctrl of this.automationControls) {
+              if (mx >= ctrl.x && mx <= ctrl.x + ctrl.w && my >= ctrl.y && my <= ctrl.y + ctrl.h) {
+                const cur = (this.automationActiveTab !== null && this.automationActiveTab !== undefined)
+                  ? this.automationActiveTab
+                  : (this._lastRenderedDeliverable || 0);
+                if (ctrl.action === 'prev') {
+                  this.automationActiveTab = (cur + 4) % 5;
+                } else if (ctrl.action === 'next') {
+                  this.automationActiveTab = (cur + 1) % 5;
+                } else if (ctrl.action === 'select') {
+                  this.automationActiveTab = ctrl.idx;
+                } else if (ctrl.action === 'toggle-auto') {
+                  this.automationActiveTab = (this.automationActiveTab === null || this.automationActiveTab === undefined) ? cur : null;
+                } else if (ctrl.action === 'modal') {
+                  this.automationActiveTab = cur;
+                  this.showAutomationModal = true;
+                }
+                if (!this.isPlaying && typeof this.render === 'function') this.render();
+                return;
+              }
+            }
+          }
+
           if (this.automationCards) {
             for (const c of this.automationCards) {
               if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) {
                 this.automationActiveTab = c.idx;
+                if (!this.isPlaying && typeof this.render === 'function') this.render();
                 return;
               }
             }
@@ -8917,6 +9636,7 @@ class PresentationApp {
             const db = this.automationDocBox;
             if (mx >= db.x && mx <= db.x + db.w && my >= db.y && my <= db.y + db.h) {
               this.showAutomationModal = true;
+              if (!this.isPlaying && typeof this.render === 'function') this.render();
               return;
             }
           }
@@ -9121,7 +9841,7 @@ class PresentationApp {
           this.canvas.style.cursor = overTab ? 'pointer' : 'default';
         }
 
-        if (slide && slide.sceneType === 'automation-deliverables-summary') {
+        if (slide && (slide.sceneType === 'automation-deliverables-summary' || ((slide.layout === 'new-workflow-allinone' || slide.id === 'v3-new-workflow' || slide.sceneType === 'new-workflow-allinone') && this._ver2ActiveStep === 2))) {
           let isPointer = false;
           if (this.showAutomationModal) {
             isPointer = true;
@@ -9131,6 +9851,14 @@ class PresentationApp {
               for (const c of this.automationCards) {
                 if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) {
                   hov = c.id;
+                  isPointer = true;
+                  break;
+                }
+              }
+            }
+            if (!isPointer && this.automationControls) {
+              for (const ctrl of this.automationControls) {
+                if (mx >= ctrl.x && mx <= ctrl.x + ctrl.w && my >= ctrl.y && my <= ctrl.y + ctrl.h) {
                   isPointer = true;
                   break;
                 }
@@ -9151,8 +9879,10 @@ class PresentationApp {
       // Escape key closes open document preview modal or automation modal
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          if (this.activeDocPreview) this.activeDocPreview = null;
-          if (this.showAutomationModal) this.showAutomationModal = false;
+          let changed = false;
+          if (this.activeDocPreview) { this.activeDocPreview = null; changed = true; }
+          if (this.showAutomationModal) { this.showAutomationModal = false; changed = true; }
+          if (changed && !this.isPlaying && typeof this.render === 'function') this.render();
         }
       });
     }

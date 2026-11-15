@@ -10,7 +10,7 @@ const extension = path.join(__dirname, 'presentation_v3_data.js');
 assert.ok(fs.existsSync(extension), 'Ver3 extension must exist');
 vm.runInContext(fs.readFileSync(extension, 'utf8'), sandbox);
 const slides = sandbox.window.DEFAULT_SLIDES;
-assert.equal(slides.reduce((sum,s)=>sum+s.duration,0),897,'Presentation duration with 15 slides (14:57 min)');
+assert.equal(slides.reduce((sum,s)=>sum+s.duration,0),897,'Presentation duration with 16 slides (14:57 min)');
 assert.ok(slides.every(s=>s.speakerCues && s.speakerCues.length>=2),'Every scene needs speaking cues');
 assert.equal(slides.length, 16);
 assert.equal(new Set(slides.map(s => s.id)).size, slides.length);

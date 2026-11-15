@@ -490,13 +490,34 @@
     const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
 
     // 1. Draw Clean Pure Background Graphic WITHOUT text or baked pills (1920x1080)
-    const bgSrc = 'assets/ver3/slide_02_pure_bg.png';
-    const bg = loadImage(bgSrc);
-    if (bg && bg.complete && bg.naturalWidth) {
-      if (typeof ctx.drawImage === 'function') ctx.drawImage(bg, 0, 0, 1920, 1080);
-    } else {
-      ctx.fillStyle = '#8ecfbd';
+    const pal = (typeof app.getCustomBackgroundPalette === 'function' && app.bgPreset && app.bgPreset !== 'default')
+      ? app.getCustomBackgroundPalette('mint')
+      : null;
+    const isDark = Boolean(pal && pal.isDark);
+
+    if (pal && pal.stops) {
+      const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
+      pal.stops.forEach((col, i) => bgGrad.addColorStop(i / Math.max(1, pal.stops.length - 1), col));
+      ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, 1920, 1080);
+
+      // Original purple teardrop motif in dark/custom preset
+      ctx.save();
+      ctx.fillStyle = '#5F3AB4';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(100, 38, 324, 308, [160, 0, 160, 160]);
+      else ctx.rect(100, 38, 324, 308);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      const bgSrc = 'assets/ver3/slide_02_pure_bg.png';
+      const bg = loadImage(bgSrc);
+      if (bg && bg.complete && bg.naturalWidth) {
+        if (typeof ctx.drawImage === 'function') ctx.drawImage(bg, 0, 0, 1920, 1080);
+      } else {
+        ctx.fillStyle = '#8ecfbd';
+        ctx.fillRect(0, 0, 1920, 1080);
+      }
     }
 
     // Helper: Rounded Rectangle / Capsule Pill
@@ -530,6 +551,10 @@
         ctx.fillRect(x, y, w, h);
       }
       ctx.restore();
+    }
+
+    if (pal && pal.stops) {
+      drawPill(28, 368, 996, 466, 0, isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(130, 120, 175, 0.25)', null, 0);
     }
 
     // Helper: Spring Ease & Scaling
@@ -616,7 +641,7 @@
       ctx.restore();
     }
 
-    // 2. REAL TEXT: Title & Header ("ไม่ใช่รูปน่ะ เป็นตัวหนังสือ เท่านั้น")
+    // 2. REAL TEXT: Title & Header
     const pTitle = Math.min(1, Math.max(0, t / 0.45));
     const easeTitle = 1 - Math.pow(1 - pTitle, 3);
     const titleX = 143 - (1 - easeTitle) * 25;
@@ -632,10 +657,12 @@
     ctx.fillRect(titleX + 20, 311, 246, 6);
     ctx.restore();
 
-    // 3. REAL TEXT: 3 Pain Points on Left (with sequential slide-in entrance & LARGE PROMINENT TYPOGRAPHY)
+    // 3. REAL TEXT: 3 Pain Points on Left (Original Clean Minimal Style)
     const p1 = Math.min(1, Math.max(0, (t - 0.3) / 0.45));
     const p2 = Math.min(1, Math.max(0, (t - 0.7) / 0.45));
     const p3 = Math.min(1, Math.max(0, (t - 1.1) / 0.45));
+    const numColor = isDark ? '#F8FAFC' : '#1c262d';
+    const bodyColor = isDark ? '#E2E8F0' : '#142922';
 
     // Point 01: Manpower Skill
     if (p1 > 0) {
@@ -645,7 +672,7 @@
       const startX = 63 + offX;
 
       ctx.font = '900 44px "Prompt", sans-serif';
-      ctx.fillStyle = '#1c262d';
+      ctx.fillStyle = numColor;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText('01 |', startX, 431);
@@ -657,7 +684,7 @@
       ctx.fillText('Manpower Skill', startX + 98 + 185, 431);
 
       ctx.font = '500 27px "Prompt", sans-serif';
-      ctx.fillStyle = '#142922';
+      ctx.fillStyle = bodyColor;
       ctx.textAlign = 'left';
       ctx.fillText('ลดการพึ่งพาทักษะเฉพาะบุคคลเพียงอย่างเดียว สร้างมาตรฐานการทำงานที่เป็นระบบ', startX, 506);
       ctx.restore();
@@ -671,7 +698,7 @@
       const startX = 63 + offX;
 
       ctx.font = '900 44px "Prompt", sans-serif';
-      ctx.fillStyle = '#1c262d';
+      ctx.fillStyle = numColor;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText('02 |', startX, 581);
@@ -683,7 +710,7 @@
       ctx.fillText('Loss Cost & Rework', startX + 98 + 220, 581);
 
       ctx.font = '500 27px "Prompt", sans-serif';
-      ctx.fillStyle = '#142922';
+      ctx.fillStyle = bodyColor;
       ctx.textAlign = 'left';
       ctx.fillText('ลดข้อผิดพลาดจากการทำงาน และลดต้นทุนความสูญเสีย', startX, 656);
       ctx.restore();
@@ -697,7 +724,7 @@
       const startX = 63 + offX;
 
       ctx.font = '900 44px "Prompt", sans-serif';
-      ctx.fillStyle = '#1c262d';
+      ctx.fillStyle = numColor;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText('03 |', startX, 731);
@@ -709,23 +736,22 @@
       ctx.fillText('Reduce Time', startX + 98 + 155, 731);
 
       ctx.font = '500 27px "Prompt", sans-serif';
-      ctx.fillStyle = '#142922';
+      ctx.fillStyle = bodyColor;
       ctx.textAlign = 'left';
       ctx.fillText('ลดระยะเวลาการจัดทำ BOM และ Drawing เพิ่มความรวดเร็วในการทำงาน', startX, 806);
       ctx.restore();
     }
 
-    // 4. RIGHT-SIDE FLOWCHART ANIMATION ("จัดให้เป็น อินนิเมช้น", "ไม่ใช่รูปน่ะ เป็นตัวหนังสือ เท่านั้น")
+    // 4. RIGHT-SIDE FLOWCHART ANIMATION
     const pContainer = Math.min(1, Math.max(0, (t - 1.2) / 0.55));
     if (pContainer > 0) {
       ctx.save();
       ctx.globalAlpha = pContainer;
-      // Outer Rounded Orange Container
       drawPill(1205, 236, 500, 672, 32, 'rgba(255, 255, 255, 0.05)', '#ff9557', 3);
       ctx.restore();
     }
 
-    // 4b. 3D Architectural Blueprint Tablet Visual (floating at top-left of container)
+    // 4b. 3D Architectural Blueprint Tablet Visual
     const pTablet = Math.min(1, Math.max(0, (t - 1.3) / 0.55));
     if (pTablet > 0) {
       const tabSrc = 'assets/ver3/slide_02_tablet.png';
@@ -744,7 +770,6 @@
     // --- STAGE 1: Inputs (House Floorplan & Planning Rule) ---
     const s1Scale = popScale((t - 1.6) / 0.5);
     if (s1Scale > 0) {
-      // House Floorplan (Circle)
       drawScaled(1045 + 69, 385 + 69, s1Scale, () => {
         drawPill(1045, 385, 138, 138, 69, '#b1c2ff', '#8dd4c2', 2.5);
         ctx.save();
@@ -757,7 +782,6 @@
         ctx.restore();
       });
 
-      // Planning Rule & Standard Variation (Capsule)
       drawScaled(1045 + 69, 545 + 112, s1Scale, () => {
         drawPill(1045, 545, 138, 224, 48, '#b1c2ff', '#8dd4c2', 2.5);
         ctx.save();
@@ -787,17 +811,14 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // BOM Floorplan
         ctx.font = '800 18px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.fillText('BOM', 1225 + 69, 375 + 55);
         ctx.fillText('Floorplan', 1225 + 69, 375 + 80);
 
-        // DWG Detail
         ctx.fillText('DWG', 1225 + 69, 375 + 165);
         ctx.fillText('Detail', 1225 + 69, 375 + 190);
 
-        // Data Material Information
         ctx.font = '700 14px "Prompt", sans-serif';
         ctx.fillText('Data', 1225 + 69, 375 + 272);
         ctx.fillText('Material', 1225 + 69, 375 + 293);
@@ -813,7 +834,6 @@
     // --- STAGE 3: Orders, Picking, and Production DWG ---
     const s3Scale = popScale((t - 3.2) / 0.5);
     if (s3Scale > 0) {
-      // PO Circle
       drawScaled(1388 + 69, 385 + 69, s3Scale, () => {
         drawPill(1388, 385, 138, 138, 69, '#ff9557', null);
         ctx.save();
@@ -825,7 +845,6 @@
         ctx.restore();
       });
 
-      // Picking Data Circle
       drawScaled(1388 + 69, 535 + 69, s3Scale, () => {
         drawPill(1388, 535, 138, 138, 69, '#ff9557', null);
         ctx.save();
@@ -838,7 +857,6 @@
         ctx.restore();
       });
 
-      // DWG Detail for Production Capsule
       drawScaled(1388 + 69, 685 + 108, s3Scale, () => {
         drawPill(1388, 685, 138, 216, 48, '#ff9557', null);
         ctx.save();
@@ -855,19 +873,18 @@
     }
 
     // --- ARROWS from Stage 3 ---
-    const pArr3 = Math.min(1, Math.max(0, (t - 4.0) / 0.35)); // PO -> Vendor
+    const pArr3 = Math.min(1, Math.max(0, (t - 4.0) / 0.35));
     drawArrow(1388 + 138, 454, 1548, 454, pArr3);
 
-    const pArr4 = Math.min(1, Math.max(0, (t - 4.0) / 0.35)); // Picking Data -> Store
+    const pArr4 = Math.min(1, Math.max(0, (t - 4.0) / 0.35));
     drawArrow(1388 + 138, 604, 1548, 604, pArr4);
 
-    const pArr5 = Math.min(1, Math.max(0, (t - 5.0) / 0.45)); // DWG Production -> Stage 5
+    const pArr5 = Math.min(1, Math.max(0, (t - 5.0) / 0.45));
     drawArrow(1388 + 138, 793, 1722, 793, pArr5);
 
     // --- STAGE 4: Vendor & Store ---
     const s4Scale = popScale((t - 4.2) / 0.5);
     if (s4Scale > 0) {
-      // Vendor Capsule
       drawScaled(1548 + 69, 295 + 110, s4Scale, () => {
         drawPill(1548, 295, 138, 220, 48, '#ff9557', null);
         ctx.save();
@@ -879,7 +896,6 @@
         ctx.restore();
       });
 
-      // Store Capsule
       drawScaled(1548 + 69, 535 + 110, s4Scale, () => {
         drawPill(1548, 535, 138, 220, 48, '#ff9557', null);
         ctx.save();
@@ -930,16 +946,16 @@
 
     // --- 5. ACTIVE FLOW ENERGY PARTICLES (Continuous Loop when t >= 6.0) ---
     if (t >= 6.0) {
-      drawArrowPulse(1045 + 138, 454, 1225, 454, 0.0);  // S1 -> S2
-      drawArrowPulse(1225 + 138, 454, 1388, 454, 0.2);  // S2 -> S3 PO
-      drawArrowPulse(1388 + 138, 454, 1548, 454, 0.4);  // PO -> Vendor
-      drawArrowPulse(1548 + 69, 515, 1548 + 69, 535, 0.55); // Vendor -> Store
-      drawArrowPulse(1388 + 138, 604, 1548, 604, 0.45); // Picking -> Store
-      drawArrowPulse(1548 + 138, 645, 1722, 645, 0.7);  // Store -> Stage 5
-      drawArrowPulse(1388 + 138, 793, 1722, 793, 0.5);  // DWG Prod -> Stage 5
+      drawArrowPulse(1045 + 138, 454, 1225, 454, 0.0);
+      drawArrowPulse(1225 + 138, 454, 1388, 454, 0.2);
+      drawArrowPulse(1388 + 138, 454, 1548, 454, 0.4);
+      drawArrowPulse(1548 + 69, 515, 1548 + 69, 535, 0.55);
+      drawArrowPulse(1388 + 138, 604, 1548, 604, 0.45);
+      drawArrowPulse(1548 + 138, 645, 1722, 645, 0.7);
+      drawArrowPulse(1388 + 138, 793, 1722, 793, 0.5);
     }
 
-    // --- 6. PAGE NUMBER BADGE ("เพิ่ม เลขหน้าด้วยครับ") -> 02 / 12 ---
+    // --- 6. PAGE NUMBER BADGE -> 03 / 16 ---
     drawPageBadge(ctx, app);
   }
 
@@ -3497,6 +3513,71 @@
     ctx.restore();
   }
 
+  function drawAspectImage(ctx, src, x, y, w, h, opts) {
+    const o = opts || {};
+    const im = loadImage(src);
+    ctx.save();
+    if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+    const rad = o.radius || 0;
+    const pad = o.pad || 0;
+
+    if (o.bgColor) {
+      ctx.fillStyle = o.bgColor;
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        if (rad > 0 && typeof ctx.roundRect === 'function') {
+          ctx.roundRect(x, y, w, h, rad);
+        } else {
+          ctx.rect(x, y, w, h);
+        }
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+
+    if (im && im.complete && im.naturalWidth > 0 && im.naturalHeight > 0 && typeof ctx.drawImage === 'function') {
+      const maxW = Math.max(2, w - pad * 2);
+      const maxH = Math.max(2, h - pad * 2);
+      const sc = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight);
+      const dw = im.naturalWidth * sc;
+      const dh = im.naturalHeight * sc;
+      const dx = x + (w - dw) / 2;
+      const dy = y + (h - dh) / 2;
+      if (rad > 0 && typeof ctx.beginPath === 'function' && typeof ctx.clip === 'function') {
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(x + 1, y + 1, w - 2, h - 2, Math.max(0, rad - 1));
+        else ctx.rect(x + 1, y + 1, w - 2, h - 2);
+        ctx.clip();
+        ctx.drawImage(im, dx, dy, dw, dh);
+        ctx.restore();
+      } else {
+        ctx.drawImage(im, dx, dy, dw, dh);
+      }
+    } else {
+      ctx.fillStyle = o.placeholderColor || 'rgba(148, 163, 184, 0.14)';
+      ctx.fillRect(x + pad, y + pad, Math.max(2, w - pad * 2), Math.max(2, h - pad * 2));
+    }
+
+    if (o.borderColor && o.borderWidth) {
+      ctx.strokeStyle = o.borderColor;
+      ctx.lineWidth = o.borderWidth;
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        if (rad > 0 && typeof ctx.roundRect === 'function') {
+          ctx.roundRect(x, y, w, h, rad);
+        } else {
+          ctx.rect(x, y, w, h);
+        }
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(x, y, w, h);
+      }
+    }
+    ctx.restore();
+  }
+
   function drawPptxCapsulePill(ctx, x, y, w, h, isAfter, line1, line2, alpha) {
     const baseAlpha = alpha !== undefined ? alpha : 1;
     ctx.save();
@@ -4220,295 +4301,701 @@
   // ============================================================================
   function drawSlide9AutomateProcessScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : (app.slideElapsed || 0);
+    const t = app.v3MotionEnabled !== false
+      ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0, nowSec)
+      : 10;
+    const elapsed = Math.max(0.8, app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0, 1.5) : 10);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
+    function rrect(x, y, w, h, r) {
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, r);
+        else ctx.rect(x, y, w, h);
+        ctx.closePath();
+      }
+    }
 
-    // Widescreen horizontal mapping matching slide_09_automate.jpg
-    function X(x) { return 156 + (x - 248.8) * 1.18; }
-    function W(w) { return w * 1.18; }
+    // 0. Clickable background theme swatches directly on canvas for Slide 10
+    const bgPresets = [
+      { id: 'default', label: 'Mint', sw: '#528271' },
+      { id: 'washi', label: 'Washi', sw: '#f3efe2' },
+      { id: 'white', label: 'White', sw: '#ffffff' },
+      { id: 'sage', label: 'Sage', sw: '#cce5d8' },
+      { id: 'emerald-dark', label: 'Dark', sw: '#132720' },
+      { id: 'blueprint', label: 'Navy', sw: '#10243e' }
+    ];
+    if (app.canvas && !app.canvas._v3Slide10BgAttached) {
+      app.canvas._v3Slide10BgAttached = true;
+      app.canvas.addEventListener('click', (e) => {
+        const cur = app.slides && app.slides[app.activeSlideIndex];
+        if (!cur || cur.id !== 'v3-automate-process') return;
+        const rect = app.canvas.getBoundingClientRect();
+        if (!rect || !rect.width || !rect.height) return;
+        const cx = (e.clientX - rect.left) * (1920 / rect.width);
+        const cy = (e.clientY - rect.top) * (1080 / rect.height);
+        if (cy >= 32 && cy <= 78) {
+          bgPresets.forEach((p, i) => {
+            const bx = 92 + i * 32;
+            if (cx >= bx - 14 && cx <= bx + 14 && typeof app.setBackgroundTheme === 'function') {
+              app.setBackgroundTheme(p.id);
+            }
+          });
+        }
+      });
+    }
 
-    // 1. Background
+    // 1. Adjustable Background Palette
+    const pal = (typeof app.getCustomBackgroundPalette === 'function')
+      ? app.getCustomBackgroundPalette('mint')
+      : {
+          preset: 'default', isDark: false,
+          stops: ['#141a18', '#466157', '#72ab99', '#8dd1be'],
+          cardFill: 'rgba(255, 255, 255, 0.96)', cardBorder: '#fe9457',
+          titleColor: '#ffffff', ink: '#0f172a', muted: '#475569',
+          gridColor: 'rgba(255, 255, 255, 0.06)', accent: '#059669', accent2: '#ef4444'
+        };
+
     if (typeof ctx.createLinearGradient === 'function') {
       const bgGrad = ctx.createLinearGradient(0, 0, 0, 1080);
-      bgGrad.addColorStop(0.00, '#141a18');
-      bgGrad.addColorStop(0.25, '#466157');
-      bgGrad.addColorStop(0.75, '#72ab99');
-      bgGrad.addColorStop(1.00, '#8dd1be');
+      const stops = pal.stops || ['#141a18', '#466157', '#72ab99'];
+      stops.forEach((col, i) => bgGrad.addColorStop(i / Math.max(1, stops.length - 1), col));
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, 1920, 1080);
     } else {
-      ctx.fillStyle = '#466157';
+      ctx.fillStyle = (pal.stops && pal.stops[0]) || '#466157';
       ctx.fillRect(0, 0, 1920, 1080);
     }
 
-    // 2. Top Header Banner (SP id=53 & 54)
-    const pHead = easeOut(t / 0.45);
+    // Subtle architectural grid texture on outer backdrop
+    if (typeof ctx.beginPath === 'function') {
+      ctx.save();
+      ctx.strokeStyle = pal.gridColor || 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let gx = 0; gx < 1920; gx += 48) { ctx.moveTo(gx, 0); ctx.lineTo(gx, 1080); }
+      for (let gy = 0; gy < 1080; gy += 48) { ctx.moveTo(0, gy); ctx.lineTo(1920, gy); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Top Header Banner (adaptive contrast for light/dark themes)
+    const pHead = easeOut(elapsed / 0.45);
     ctx.save();
     ctx.globalAlpha = pHead;
     if (typeof ctx.createLinearGradient === 'function') {
-      const topBan = ctx.createLinearGradient(0, 14, 1920, 14);
-      topBan.addColorStop(0.00, 'rgba(68, 94, 84, 0.95)');
-      topBan.addColorStop(0.75, 'rgba(78, 106, 95, 0.85)');
-      topBan.addColorStop(1.00, 'rgba(78, 106, 95, 0.20)');
+      const topBan = ctx.createLinearGradient(0, 12, 1920, 12);
+      if (pal.preset === 'washi' || pal.preset === 'white' || pal.preset === 'sage' || (pal.preset === 'custom' && !pal.isDark)) {
+        topBan.addColorStop(0.00, 'rgba(255, 255, 255, 0.90)');
+        topBan.addColorStop(0.50, 'rgba(241, 248, 245, 0.94)');
+        topBan.addColorStop(1.00, 'rgba(255, 255, 255, 0.78)');
+      } else {
+        topBan.addColorStop(0.00, 'rgba(18, 42, 34, 0.92)');
+        topBan.addColorStop(0.65, 'rgba(30, 68, 56, 0.88)');
+        topBan.addColorStop(1.00, 'rgba(30, 68, 56, 0.35)');
+      }
       ctx.fillStyle = topBan;
     } else {
-      ctx.fillStyle = '#486258';
+      ctx.fillStyle = pal.isDark ? '#1a382e' : '#f1f5f9';
     }
-    ctx.fillRect(0, 14, 1920, 86);
+    ctx.fillRect(0, 12, 1920, 84);
 
-    ctx.fillStyle = '#ffffff';
+    // Top-left interactive Background Swatch Pill (clear of center title)
+    ctx.fillStyle = (pal.preset === 'default' || pal.isDark) ? 'rgba(255, 255, 255, 0.14)' : 'rgba(15, 23, 42, 0.08)';
+    rrect(24, 34, 266, 42, 21);
+    if (typeof ctx.beginPath === 'function') ctx.fill();
+    else ctx.fillRect(24, 34, 266, 42);
+    ctx.fillStyle = pal.titleColor;
+    ctx.font = '700 14px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('BG:', 42, 60);
+    bgPresets.forEach((p, idx) => {
+      const bx = 92 + idx * 32;
+      const by = 55;
+      const actBg = pal.preset === p.id;
+      if (typeof ctx.arc === 'function') {
+        ctx.beginPath();
+        ctx.arc(bx, by, actBg ? 11.5 : 9.5, 0, Math.PI * 2);
+        ctx.fillStyle = p.sw;
+        ctx.fill();
+        ctx.strokeStyle = actBg ? '#10b981' : 'rgba(148, 163, 184, 0.75)';
+        ctx.lineWidth = actBg ? 2.5 : 1.2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.sw;
+        ctx.fillRect(bx - 8, by - 8, 16, 16);
+      }
+    });
+
+    // Centered Slide Title + Live Status Pill
+    ctx.fillStyle = pal.titleColor;
     ctx.textAlign = 'center';
-    ctx.font = '800 46px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('NEW Automate Process', 960, 52);
-    ctx.font = '700 23px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Automate of Interior wall & Partition (STD.)', 920, 86);
+    ctx.font = '800 42px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('NEW Automate Process', 960, 50);
+    ctx.font = '700 21px "Prompt", "Segoe UI", sans-serif';
+    ctx.globalAlpha = pHead * 0.9;
+    ctx.fillText('Automate of Interior wall & Partition (STD.)', 960, 82);
+
+    ctx.globalAlpha = pHead;
     ctx.textAlign = 'left';
+    const pulseDot = 0.55 + 0.45 * Math.sin(t * 4.5);
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+    rrect(1440, 35, 246, 40, 20);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    if (typeof ctx.arc === 'function') {
+      ctx.beginPath();
+      ctx.arc(1462, 55, 6, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
+      ctx.fill();
+    }
+    ctx.fillStyle = (pal.preset === 'default' || pal.isDark) ? '#6ee7b7' : '#065f46';
+    ctx.font = '700 14px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('LIVE WORKFLOW • GIF 60FPS', 1478, 60);
     ctx.restore();
 
     drawPageBadge(ctx, app);
 
-    // 3. Large White/Mint Rounded Outer Stage Card (SP id=52: y=102..1062)
-    const pCard = easeOut((t - 0.1) / 0.45);
+    // 3. Outer Stage Card (Responsive to background preset & custom color)
+    const isCardDark = pal.preset === 'emerald-dark' || pal.preset === 'blueprint' || (pal.preset === 'custom' && pal.isDark);
+    const stageInk = isCardDark ? '#f1f5f9' : '#0f172a';
+    const stageSubInk = isCardDark ? '#cbd5e1' : '#334155';
+    const pCard = easeOut((elapsed - 0.05) / 0.4);
     ctx.save();
     ctx.globalAlpha = pCard;
     if (typeof ctx.createLinearGradient === 'function') {
-      const cardGrad = ctx.createLinearGradient(12, 102, 1908, 102);
-      cardGrad.addColorStop(0.00, '#cbeae0');
-      cardGrad.addColorStop(0.08, '#effaf6');
-      cardGrad.addColorStop(0.16, '#ffffff');
-      cardGrad.addColorStop(1.00, '#ffffff');
+      const cardGrad = ctx.createLinearGradient(16, 102, 1904, 1062);
+      if (pal.preset === 'washi') {
+        cardGrad.addColorStop(0, '#faf7ee');
+        cardGrad.addColorStop(1, '#f3efe2');
+      } else if (pal.preset === 'sage') {
+        cardGrad.addColorStop(0, '#e2f3ea');
+        cardGrad.addColorStop(1, '#eef8f3');
+      } else if (pal.preset === 'emerald-dark') {
+        cardGrad.addColorStop(0, '#10241d');
+        cardGrad.addColorStop(1, '#17342a');
+      } else if (pal.preset === 'blueprint') {
+        cardGrad.addColorStop(0, '#0f2238');
+        cardGrad.addColorStop(1, '#163150');
+      } else if (pal.preset === 'custom') {
+        cardGrad.addColorStop(0, pal.stops[0] || '#f8fafc');
+        cardGrad.addColorStop(1, pal.stops[pal.stops.length - 1] || '#eef2f6');
+      } else if (pal.preset === 'white') {
+        cardGrad.addColorStop(0, '#ffffff');
+        cardGrad.addColorStop(1, '#f8fafc');
+      } else {
+        cardGrad.addColorStop(0.00, '#e6f5ef');
+        cardGrad.addColorStop(0.14, '#ffffff');
+        cardGrad.addColorStop(1.00, '#ffffff');
+      }
       ctx.fillStyle = cardGrad;
     } else {
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = isCardDark ? '#142a22' : '#ffffff';
     }
-    ctx.strokeStyle = '#fe9457';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = pal.preset === 'default' ? '#fe9457' : (pal.cardBorder || '#10b981');
+    ctx.lineWidth = 2;
+    rrect(16, 102, 1888, 962, 34);
     if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(12, 102, 1896, 960, 44);
-      } else {
-        ctx.rect(12, 102, 1896, 960);
-      }
-      ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillRect(12, 102, 1896, 960);
+      ctx.fillRect(16, 102, 1888, 962);
     }
     ctx.restore();
 
-    // 4. TOP SECTION: IW (Interior Wall) (SP id=31: X(248.8), 124, W(1418.7), 374)
-    const pIW = easeOut((t - 0.2) / 0.5);
+    // Animation Cycle Timers (60fps living workflow!)
+    const activeIWStep = Math.floor(t / 2.2) % 6;
+    const iwStepProgress = (t / 2.2) % 1;
+    const activeIWTool = Math.floor((t * 2.2) % 9);
+    const activePTTool = Math.floor((t * 2.0 + 3) % 11);
+    const activePRule = Math.floor(t / 2.6) % 4;
+    const pIW = easeOut((elapsed - 0.1) / 0.4);
+    const pMid = easeOut((elapsed - 0.2) / 0.4);
+    const pPT = easeOut((elapsed - 0.25) / 0.45);
+
+    // =========================================================================
+    // 4. TOP SECTION: IW (Interior Wall) (x=36..1884, y=118..498)
+    // =========================================================================
     ctx.save();
     ctx.globalAlpha = pIW;
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(X(248.8), 124, W(1418.7), 374);
+    ctx.fillStyle = isCardDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(248, 250, 252, 0.62)';
+    rrect(36, 118, 1848, 380, 20);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = isCardDark ? 'rgba(148, 163, 184, 0.35)' : '#94a3b8';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(36, 118, 1848, 380);
+    }
 
-    // Left Label: IW (Interior Wall)
-    ctx.fillStyle = '#1e293b';
+    // Left Section Title Pill: IW (Interior Wall)
+    ctx.fillStyle = stageInk;
     ctx.font = '800 44px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('IW', X(262), 312);
-    ctx.font = '700 20px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('(Interior Wall)', X(262), 344);
-
-    // 6 Top Step Diagrams (01..06)
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_7_image41.png', X(420.3), 132, W(241.7), 192, null, 0, pIW);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_8_image41.png', X(662.0), 132, W(253.8), 192, null, 0, pIW);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_9_image41.png', X(919.1), 132, W(226.1), 192, null, 0, pIW);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_11_image41.png', X(1146.5), 132, W(164.8), 194, null, 0, pIW);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_12_image41.png', X(1311.3), 132, W(173.0), 194, null, 0, pIW);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_13_image41.png', X(1483.8), 132, W(158.1), 194, null, 0, pIW);
-
-    // IW Toolbar Group (#1..#9)
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_20_image43.png', X(399.5), 342, W(705.1), 146, null, 0, pIW);
-    // Cover baked-in #1..#9 inside pic_20_image43.png (matching PPTX TextBox 20 fill #e2e2e2)
-    ctx.fillStyle = '#e2e2e2';
-    ctx.fillRect(X(412), 430, W(678), 44);
-    const iwNums = ['#1', '#2', '#3', '#4', '#5', '#6', '#7', '#8', '#9'];
-    const iwXs = [450, 522, 594, 672, 748, 822, 896, 972, 1044];
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 25px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('IW', 56, 260);
+    ctx.fillStyle = stageSubInk;
+    ctx.font = '700 19px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('(Interior Wall)', 56, 290);
+    const iwStepColors = ['#059669', '#0284c7', '#ea580c', '#10b981', '#16a34a', '#0d9488'];
+    const curStepColor = iwStepColors[activeIWStep];
+    ctx.fillStyle = curStepColor;
+    rrect(56, 314, 152, 32, 16);
+    if (typeof ctx.beginPath === 'function') ctx.fill();
+    else ctx.fillRect(56, 314, 152, 32);
+    ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    iwNums.forEach((n, idx) => {
-      ctx.fillText(n, X(iwXs[idx]), 466);
+    ctx.font = '800 14px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText(`STEP 0${activeIWStep + 1} / 06 LIVE`, 132, 335);
+    ctx.textAlign = 'left';
+
+    // 6 Top Step Diagrams (01..06) — Exact aspect-ratio preserved cards with living spotlight!
+    const iwCards = [
+      { num: '01', label: 'CODING', img: 'assets/ver3/slide10_auto/pic_7_image41.png', col: '#059669' },
+      { num: '02', label: 'GRID LINE', img: 'assets/ver3/slide10_auto/pic_8_image41.png', col: '#0284c7' },
+      { num: '03', label: 'TSUMA / KETA', img: 'assets/ver3/slide10_auto/pic_9_image41.png', col: '#ea580c' },
+      { num: '04', label: 'BASE FRAME', img: 'assets/ver3/slide10_auto/pic_11_image41.png', col: '#10b981' },
+      { num: '05', label: 'SMART BOARD', img: 'assets/ver3/slide10_auto/pic_12_image41.png', col: '#16a34a' },
+      { num: '06', label: 'WINDOW', img: 'assets/ver3/slide10_auto/pic_13_image41.png', col: '#0d9488' }
+    ];
+    const iwStartX = 232;
+    const iwCardW = 258;
+    const iwCardGap = 14;
+    const iwCardY = 128;
+    const iwCardH = 196;
+
+    // Animated connecting progress rail behind cards
+    if (typeof ctx.beginPath === 'function') {
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(iwStartX + iwCardW / 2, iwCardY + iwCardH / 2);
+      ctx.lineTo(iwStartX + 5 * (iwCardW + iwCardGap) + iwCardW / 2, iwCardY + iwCardH / 2);
+      ctx.stroke();
+
+      const beamX = iwStartX + iwCardW / 2 + (activeIWStep + clamp(iwStepProgress, 0, 1)) * (iwCardW + iwCardGap);
+      ctx.strokeStyle = curStepColor;
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(iwStartX + iwCardW / 2, iwCardY + iwCardH / 2);
+      ctx.lineTo(Math.min(iwStartX + 5 * (iwCardW + iwCardGap) + iwCardW / 2, beamX), iwCardY + iwCardH / 2);
+      ctx.stroke();
+    }
+
+    iwCards.forEach((cd, idx) => {
+      const isActive = idx === activeIWStep;
+      const pop = isActive ? (2.5 * Math.sin(iwStepProgress * Math.PI)) : 0;
+      const cx = iwStartX + idx * (iwCardW + iwCardGap) - pop * 0.5;
+      const cy = iwCardY - pop;
+      const cw = iwCardW + pop;
+      const ch = iwCardH + pop;
+
+      ctx.save();
+      ctx.shadowColor = isActive ? cd.col : 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = isActive ? 18 : 8;
+      ctx.shadowOffsetY = 3;
+      drawAspectImage(ctx, cd.img, cx, cy, cw, ch, {
+        alpha: pIW,
+        radius: 14,
+        pad: 8,
+        bgColor: '#ffffff',
+        borderColor: isActive ? cd.col : '#cbd5e1',
+        borderWidth: isActive ? 3.2 : 1.2
+      });
+      ctx.restore();
+
+      ctx.fillStyle = isActive ? cd.col : '#1e293b';
+      rrect(cx + 8, cy + 8, 96, 22, 6);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      else ctx.fillRect(cx + 8, cy + 8, 96, 22);
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.font = '800 11px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(`${cd.num} ${cd.label}`, cx + 56, cy + 23);
+
+      if (isActive && typeof ctx.arc === 'function') {
+        ctx.beginPath();
+        ctx.arc(cx + cw - 16, cy + 19, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+      }
+      ctx.textAlign = 'left';
     });
 
-    // 3D Isometric Wall Preview (pic_26_image44.png)
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_26_image44.png', X(1109.5), 348, W(218.6), 136, null, 0, pIW);
+    // IW Toolbar Group (#1..#9) — ZERO STRETCH! Crisp 1:1 Square Icons from ICON/Interior/
+    const iwIcons = [
+      { n: '#1', src: 'ICON/Interior/3d-wall.png' },
+      { n: '#2', src: 'ICON/Interior/sw-frame.png' },
+      { n: '#3', src: 'ICON/Interior/sp-frame.png' },
+      { n: '#4', src: 'ICON/Interior/CODE.png' },
+      { n: '#5', src: 'ICON/Interior/sw-board.png' },
+      { n: '#6', src: 'ICON/Interior/SB-IW.png' },
+      { n: '#7', src: 'ICON/Interior/SB-Joint.png' },
+      { n: '#8', src: 'ICON/Interior/One Command.png', hero: true },
+      { n: '#9', src: 'ICON/Interior/uploaddb.png' }
+    ];
+    const iwBarX = 232, iwBarY = 338, iwBarW = 876, iwBarH = 148;
+    ctx.fillStyle = '#e5e7eb';
+    rrect(iwBarX, iwBarY, iwBarW, iwBarH, 18);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+    } else {
+      ctx.fillRect(iwBarX, iwBarY, iwBarW, iwBarH);
+    }
 
-    // 3 Blue Vertical Progress Bars (IW: 100% 100% 100%)
-    const barXs = [1364.7, 1465.5, 1562.9];
-    barXs.forEach((bx) => {
-      ctx.fillStyle = '#7dd3fc';
+    const iwTileSize = 82;
+    const iwTileGap = 11.5;
+    const iwFirstX = iwBarX + (iwBarW - (9 * iwTileSize + 8 * iwTileGap)) / 2;
+    iwIcons.forEach((ic, idx) => {
+      const ix = iwFirstX + idx * (iwTileSize + iwTileGap);
+      const iy = iwBarY + 14;
+      const isLit = (idx === activeIWTool) || (ic.hero && (activeIWTool === 7 || activeIWStep === 5));
+      const pop = isLit ? 3 : 0;
+
+      ctx.save();
+      if (isLit) {
+        ctx.shadowColor = ic.hero ? '#ef4444' : '#10b981';
+        ctx.shadowBlur = 14;
+      }
+      drawAspectImage(ctx, ic.src, ix, iy - pop, iwTileSize, iwTileSize, {
+        alpha: pIW,
+        radius: 12,
+        pad: 5,
+        bgColor: '#e2e2e2',
+        borderColor: isLit ? (ic.hero ? '#ef4444' : '#059669') : '#ffffff',
+        borderWidth: isLit ? 3 : 1.5
+      });
+      ctx.restore();
+
+      if (isLit) {
+        ctx.fillStyle = ic.hero ? '#dc2626' : '#059669';
+        rrect(ix + 16, iwBarY + 106, iwTileSize - 32, 28, 8);
+        if (typeof ctx.beginPath === 'function') ctx.fill();
+      }
+      ctx.fillStyle = isLit ? '#ffffff' : '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.font = '800 22px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(ic.n, ix + iwTileSize / 2, iwBarY + 128);
+      ctx.textAlign = 'left';
+    });
+
+    // 3D Isometric Wall Preview Card (aspect-ratio preserved + live scan sweep + GIF loop badge)
+    const isoX = 1130, isoY = 338, isoW = 330, isoH = 148;
+    drawAspectImage(ctx, 'assets/ver3/slide10_auto/pic_26_image44.png', isoX, isoY, isoW, isoH, {
+      alpha: pIW,
+      radius: 14,
+      pad: 6,
+      bgColor: '#ffffff',
+      borderColor: '#059669',
+      borderWidth: 2
+    });
+    if (typeof ctx.clip === 'function' && typeof ctx.beginPath === 'function') {
+      ctx.save();
+      rrect(isoX + 2, isoY + 2, isoW - 4, isoH - 4, 12);
+      ctx.clip();
+      const scanPos = ((t * 0.42) % 1) * (isoW + 60) - 30;
+      if (typeof ctx.createLinearGradient === 'function') {
+        const scGrad = ctx.createLinearGradient(isoX + scanPos - 26, isoY, isoX + scanPos + 26, isoY);
+        scGrad.addColorStop(0, 'rgba(16, 185, 129, 0)');
+        scGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.24)');
+        scGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        ctx.fillStyle = scGrad;
+        ctx.fillRect(isoX + scanPos - 26, isoY, 52, isoH);
+      }
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.84)';
+    rrect(isoX + 8, isoY + 8, 122, 22, 6);
+    if (typeof ctx.beginPath === 'function') ctx.fill();
+    ctx.fillStyle = '#34d399';
+    ctx.textAlign = 'center';
+    ctx.font = '800 11px "JetBrains Mono", "Prompt", sans-serif';
+    ctx.fillText('▶ 3D GIF BUILD', isoX + 69, isoY + 23);
+    ctx.textAlign = 'left';
+
+    // Right 100% Animated Gauges (IW)
+    const iwBarXs = [1508, 1632, 1756];
+    const iwFillProg = clamp((elapsed - 0.25) / 0.85, 0.2, 1);
+    iwBarXs.forEach((bx, bi) => {
+      const trackX = bx, trackY = 342, trackW = 36, trackH = 88;
+      ctx.fillStyle = '#e2e8f0';
+      rrect(trackX, trackY, trackW, trackH, 8);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      const wave = 1 - 0.04 * Math.abs(Math.sin(t * 2.2 + bi * 1.1));
+      const fh = trackH * iwFillProg * wave;
+      ctx.fillStyle = bi === 0 ? '#38bdf8' : (bi === 1 ? '#0ea5e9' : '#10b981');
+      rrect(trackX, trackY + trackH - fh, trackW, fh, 6);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
       ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 1.2;
-      ctx.fillRect(X(bx), 342, W(21.7), 86);
-      ctx.strokeRect(X(bx), 342, W(21.7), 86);
-      ctx.fillStyle = '#0f172a';
-      ctx.font = '700 18px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText('100%', X(bx + 10.8), 452);
+      ctx.lineWidth = 1.4;
+      rrect(trackX, trackY, trackW, trackH, 8);
+      if (typeof ctx.beginPath === 'function') ctx.stroke();
+      ctx.fillStyle = stageInk;
+      ctx.textAlign = 'center';
+      ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText('100%', trackX + trackW / 2, 456);
     });
-    ctx.font = '700 17px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Implement (from AUG ,2024)', X(1475), 482);
+    ctx.fillStyle = stageInk;
+    ctx.textAlign = 'center';
+    ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Implement (from AUG, 2024)', 1650, 484);
     ctx.textAlign = 'left';
     ctx.restore();
 
-    // 5. MIDDLE PIPELINE: Import CAD >>> SketchUp ➔ BOM MRP DWG
-    const pMid = easeOut((t - 0.3) / 0.45);
+    // =========================================================================
+    // 5. MIDDLE PIPELINE: Import CAD >>> SketchUp ──▶ BOM  MRP  DWG
+    // =========================================================================
     ctx.save();
     ctx.globalAlpha = pMid;
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '600 20px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Import CAD >>> SketchUp', X(248.8), 526);
+    ctx.fillStyle = stageInk;
+    ctx.font = '800 22px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Import CAD >>> SketchUp', 48, 529);
 
-    // Red Arrow (X(510) to X(1315) at y=519)
+    const pipeStart = 350, pipeEnd = 1435, pipeY = 521;
     if (typeof ctx.beginPath === 'function') {
       ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 6.5;
+      ctx.lineWidth = 7;
       ctx.beginPath();
-      ctx.moveTo(X(505), 519);
-      ctx.lineTo(X(1300), 519);
+      ctx.moveTo(pipeStart, pipeY);
+      ctx.lineTo(pipeEnd - 18, pipeY);
       ctx.stroke();
 
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
-      ctx.moveTo(X(1318), 519);
-      ctx.lineTo(X(1296), 506);
-      ctx.lineTo(X(1296), 532);
+      ctx.moveTo(pipeEnd + 6, pipeY);
+      ctx.lineTo(pipeEnd - 18, pipeY - 12);
+      ctx.lineTo(pipeEnd - 18, pipeY + 12);
       ctx.closePath();
       ctx.fill();
+
+      for (let pk = 0; pk < 6; pk++) {
+        const phase = ((t * 0.48 + pk / 6) % 1);
+        const px = pipeStart + phase * (pipeEnd - 24 - pipeStart);
+        if (typeof ctx.arc === 'function') {
+          ctx.beginPath();
+          ctx.arc(px, pipeY, 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#fef08a';
+          ctx.fill();
+          ctx.strokeStyle = '#dc2626';
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        }
+      }
     }
 
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '800 25px "Prompt", "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('BOM', X(1375), 526);
-    ctx.fillText('MRP', X(1476), 526);
-    ctx.fillText('DWG', X(1574), 526);
+    const outLabels = ['BOM', 'MRP', 'DWG'];
+    const outXs = [1526, 1650, 1774];
+    outLabels.forEach((lbl, li) => {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3.8 - li * 0.9);
+      ctx.fillStyle = `rgba(16, 185, 129, ${(0.12 + 0.14 * pulse).toFixed(2)})`;
+      rrect(outXs[li] - 46, 503, 92, 34, 10);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = stageInk;
+      ctx.textAlign = 'center';
+      ctx.font = '800 24px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(lbl, outXs[li], 529);
+    });
     ctx.textAlign = 'left';
     ctx.restore();
 
-    // 6. BOTTOM SECTION: PT (Partition) (SP id=32: X(248.8), 540, W(1418.7), 508)
-    const pPT = easeOut((t - 0.38) / 0.55);
+    // =========================================================================
+    // 6. BOTTOM SECTION: PT (Partition) (x=36..1884, y=544..1048)
+    // =========================================================================
     ctx.save();
     ctx.globalAlpha = pPT;
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.4;
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([6, 4]);
-    ctx.strokeRect(X(248.8), 540, W(1418.7), 508);
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    ctx.fillStyle = isCardDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(248, 250, 252, 0.62)';
+    rrect(36, 544, 1848, 504, 20);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = isCardDark ? 'rgba(148, 163, 184, 0.45)' : '#334155';
+      ctx.lineWidth = 1.5;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([7, 4]);
+      ctx.stroke();
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    } else {
+      ctx.strokeRect(36, 544, 1848, 504);
+    }
 
     // Left Label: PT (Partition)
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = stageInk;
     ctx.font = '800 44px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('PT', X(262), 622);
-    ctx.font = '700 20px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('(Partition)', X(262), 652);
+    ctx.fillText('PT', 56, 616);
+    ctx.fillStyle = stageSubInk;
+    ctx.font = '700 19px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('(Partition)', 56, 646);
 
-    // PT Toolbar Rounded Box (X(420.3), 556, W(906.4), 136)
-    ctx.fillStyle = '#d6d3d1';
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 3.0;
+    // PT Toolbar Rounded Box (#1..#11 — ZERO STRETCH! Crisp 1:1 Square Icons!)
+    const ptBarX = 232, ptBarY = 556, ptBarW = 1228, ptBarH = 142;
+    ctx.fillStyle = '#e5e7eb';
+    rrect(ptBarX, ptBarY, ptBarW, ptBarH, 18);
     if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(X(420.3), 556, W(906.4), 136, 16);
-      } else {
-        ctx.rect(X(420.3), 556, W(906.4), 136);
-      }
-      ctx.closePath();
       ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2.6;
       ctx.stroke();
     } else {
-      ctx.fillRect(X(420.3), 556, W(906.4), 136);
+      ctx.fillRect(ptBarX, ptBarY, ptBarW, ptBarH);
     }
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_18_image42.png', X(426), 566, W(850.8), 76, null, 0, pPT);
 
-    const ptNums = ['#1', '#2', '#3', '#4', '#5', '#6', '#7', '#8', '#9', '#10', '#11'];
-    const ptXs = [462, 536, 616, 704, 778, 852, 926, 1012, 1084, 1160, 1244];
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 25px "Prompt", "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ptNums.forEach((n, idx) => {
-      ctx.fillText(n, X(ptXs[idx]), 676);
+    const ptIcons = [
+      { n: '#1', src: 'ICON/Interior/level.png' },
+      { n: '#2', src: 'ICON/Interior/door-spec.png' },
+      { n: '#3', src: 'ICON/Interior/spframe.png' },
+      { n: '#4', src: 'ICON/Interior/door-speddc.png' },
+      { n: '#5', src: 'assets/ver3/slide10_auto/icon_pt_05_codept.png' },
+      { n: '#6', src: 'ICON/Interior/Change partition code.png' },
+      { n: '#7', src: 'ICON/Interior/buildpartition.png' },
+      { n: '#8', src: 'ICON/Interior/SB-joint pt.png' },
+      { n: '#9', src: 'assets/ver3/slide10_auto/icon_pt_09_voidstair.png' },
+      { n: '#10', src: 'ICON/Interior/PSpanel.png' },
+      { n: '#11', src: 'ICON/Interior/Regen Tag.png' }
+    ];
+    const ptTileSize = 80;
+    const ptTileGap = 26;
+    const ptFirstX = ptBarX + (ptBarW - (11 * ptTileSize + 10 * ptTileGap)) / 2;
+    ptIcons.forEach((ic, idx) => {
+      const ix = ptFirstX + idx * (ptTileSize + ptTileGap);
+      const iy = ptBarY + 13;
+      const isLit = idx === activePTTool;
+      const pop = isLit ? 3 : 0;
+
+      ctx.save();
+      if (isLit) {
+        ctx.shadowColor = '#0284c7';
+        ctx.shadowBlur = 14;
+      }
+      drawAspectImage(ctx, ic.src, ix, iy - pop, ptTileSize, ptTileSize, {
+        alpha: pPT,
+        radius: 12,
+        pad: 4,
+        bgColor: '#e2e2e2',
+        borderColor: isLit ? '#0284c7' : '#ffffff',
+        borderWidth: isLit ? 3 : 1.5
+      });
+      ctx.restore();
+
+      if (isLit) {
+        ctx.fillStyle = '#0284c7';
+        rrect(ix + 14, ptBarY + 102, ptTileSize - 28, 28, 8);
+        if (typeof ctx.beginPath === 'function') ctx.fill();
+      }
+      ctx.fillStyle = isLit ? '#ffffff' : '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.font = '800 22px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(ic.n, ix + ptTileSize / 2, ptBarY + 124);
+      ctx.textAlign = 'left';
     });
 
-    // Right 100% + 3 Blue Progress Bars for PT
-    const ptBarXs = [1364.7, 1468.7, 1572.7];
-    ptBarXs.forEach((bx) => {
-      ctx.fillStyle = '#0f172a';
-      ctx.font = '700 18px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText('100%', X(bx + 10.8), 568);
-      ctx.fillStyle = '#7dd3fc';
+    // Right 100% Animated Gauges (PT)
+    const ptBarXs = [1508, 1632, 1756];
+    const ptFillProg = clamp((elapsed - 0.35) / 0.85, 0.2, 1);
+    ptBarXs.forEach((bx, bi) => {
+      const trackX = bx, trackY = 582, trackW = 36, trackH = 82;
+      ctx.fillStyle = '#e2e8f0';
+      rrect(trackX, trackY, trackW, trackH, 8);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      const wave = 1 - 0.04 * Math.abs(Math.cos(t * 2.1 + bi));
+      const fh = trackH * ptFillProg * wave;
+      ctx.fillStyle = '#38bdf8';
+      rrect(trackX, trackY + trackH - fh, trackW, fh, 6);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
       ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 1.2;
-      ctx.fillRect(X(bx), 598, W(21.7), 86);
-      ctx.strokeRect(X(bx), 598, W(21.7), 86);
+      ctx.lineWidth = 1.4;
+      rrect(trackX, trackY, trackW, trackH, 8);
+      if (typeof ctx.beginPath === 'function') ctx.stroke();
+      ctx.fillStyle = stageInk;
+      ctx.textAlign = 'center';
+      ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText('100%', trackX + trackW / 2, 570);
     });
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 16.5px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Standard P-Rule (Run Test > OK)', X(1478), 704);
-
-    // Bottom-Left Green Dashed Box (Standard P-Rule)
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 1.5;
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 3]);
-    if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(X(264.5), 710, W(970.1), 218, 18);
-      } else {
-        ctx.rect(X(264.5), 710, W(970.1), 218);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 20px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Standard P-Rule (Run Test > OK)', X(665), 732);
-
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_34_image45.png', X(275.1), 752, W(271.1), 165, '#334155', 1.2, pPT);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_47_image48.png', X(561.0), 752, W(233.2), 165, '#334155', 1.2, pPT);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_46_image47.png', X(805.0), 752, W(217.4), 165, '#334155', 1.2, pPT);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_51_image49.png', X(1038.1), 765, W(176.0), 98, '#334155', 1.2, pPT);
-
-    // Bottom 4 Labels under Standard P-Rule
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 17px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Coding', X(365), 948);
-    ctx.fillText('Gridline', X(495), 948);
-    ctx.fillText('Run Object Component', X(720), 948);
-    ctx.fillText('Single / Double Partition', X(990), 948);
-
-    // Bottom-Right Red Dashed Box (Out P rule – Detail DWG)
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1.5;
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 3]);
-    if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(X(1250.4), 710, W(405.6), 218, 18);
-      } else {
-        ctx.rect(X(1250.4), 710, W(405.6), 218);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '800 23px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Out P rule – Detail DWG', X(1395), 742);
-
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_44_image46.png', X(1285), 760, W(336), 68, null, 0, pPT);
-    drawPptxImage(ctx, 'assets/ver3/slide10_auto/pic_45_image46.png', X(1285), 838, W(336), 82, null, 0, pPT);
-
+    ctx.fillStyle = stageInk;
+    ctx.textAlign = 'center';
+    ctx.font = '800 17px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Standard P-Rule (Run Test > OK)', 1650, 692);
     ctx.textAlign = 'left';
+
+    // Bottom-Left Green Dashed Box (Standard P-Rule) — Aspect Ratio Preserved + Live Cycle!
+    const pBoxX = 56, pBoxY = 712, pBoxW = 1264, pBoxH = 290;
+    ctx.fillStyle = isCardDark ? 'rgba(255, 255, 255, 0.94)' : '#ffffff';
+    rrect(pBoxX, pBoxY, pBoxW, pBoxH, 18);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    }
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '800 20px "Prompt", "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Standard P-Rule (Run Test > OK)', pBoxX + pBoxW / 2, pBoxY + 30);
+
+    const okPulse = 0.72 + 0.28 * Math.sin(t * 4);
+    ctx.fillStyle = `rgba(16, 185, 129, ${okPulse.toFixed(2)})`;
+    rrect(pBoxX + pBoxW - 156, pBoxY + 10, 138, 26, 13);
+    if (typeof ctx.beginPath === 'function') ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 12px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('RUN TEST > OK ✓', pBoxX + pBoxW - 87, pBoxY + 27);
+    ctx.textAlign = 'left';
+
+    const pRuleCards = [
+      { img: 'assets/ver3/slide10_auto/pic_34_image45.png', cap: 'Coding & Gridline', w: 344, x: pBoxX + 18 },
+      { img: 'assets/ver3/slide10_auto/pic_47_image48.png', cap: 'Run Object Component', w: 286, x: pBoxX + 378 },
+      { img: 'assets/ver3/slide10_auto/pic_46_image47.png', cap: 'Single / Double Partition', w: 274, x: pBoxX + 680 },
+      { img: 'assets/ver3/slide10_auto/pic_51_image49.png', cap: 'SketchUp 3D Model', w: 274, x: pBoxX + 970 }
+    ];
+    pRuleCards.forEach((rc, rIdx) => {
+      const isPRLit = rIdx === activePRule;
+      drawAspectImage(ctx, rc.img, rc.x, pBoxY + 46, rc.w, 206, {
+        alpha: pPT,
+        radius: 10,
+        pad: 4,
+        bgColor: '#ffffff',
+        borderColor: isPRLit ? '#10b981' : '#cbd5e1',
+        borderWidth: isPRLit ? 2.8 : 1.2
+      });
+      ctx.fillStyle = isPRLit ? (isCardDark ? '#34d399' : '#047857') : stageInk;
+      ctx.textAlign = 'center';
+      ctx.font = '800 17px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(rc.cap, rc.x + rc.w / 2, pBoxY + pBoxH + 24);
+      ctx.textAlign = 'left';
+    });
+
+    // Bottom-Right Red Dashed Box (Out P rule – Detail DWG) — Aspect Ratio Preserved
+    const outBoxX = 1344, outBoxY = 712, outBoxW = 520, outBoxH = 290;
+    ctx.fillStyle = isCardDark ? 'rgba(255, 255, 255, 0.94)' : '#ffffff';
+    rrect(outBoxX, outBoxY, outBoxW, outBoxH, 18);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    }
+
+    ctx.fillStyle = '#0f172a';
+    ctx.textAlign = 'center';
+    ctx.font = '800 22px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Out P rule – Detail DWG', outBoxX + outBoxW / 2, outBoxY + 32);
+    ctx.textAlign = 'left';
+
+    drawAspectImage(ctx, 'assets/ver3/slide10_auto/pic_44_image46.png', outBoxX + 18, outBoxY + 46, outBoxW - 36, 108, {
+      alpha: pPT, radius: 8, pad: 4, bgColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1
+    });
+    drawAspectImage(ctx, 'assets/ver3/slide10_auto/pic_45_image46.png', outBoxX + 18, outBoxY + 164, outBoxW - 36, 114, {
+      alpha: pPT, radius: 8, pad: 4, bgColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1
+    });
+
     ctx.restore();
   }
 
@@ -4518,212 +5005,572 @@
   // ============================================================================
   function drawSlide10HolePlugAutomateScene(app, s) {
     const ctx = app.ctx;
+    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : (app.slideElapsed || 0);
     const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
+    function rrect(x, y, w, h, r) {
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        const rad = Math.min(r, Math.min(w, h) / 2);
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, rad);
+        else ctx.rect(x, y, w, h);
+        ctx.closePath();
+      }
+    }
+    const fit = (txt, x, y, maxW, size, weight, family, align = 'left') => {
+      if (typeof app.fillFittedText === 'function') {
+        app.fillFittedText(ctx, txt, x, y, maxW, size, weight, family, align);
+      } else {
+        ctx.textAlign = align;
+        ctx.font = `${weight} ${size}px ${family}`;
+        ctx.fillText(txt, x, y);
+        ctx.textAlign = 'left';
+      }
+    };
 
-    // Widescreen horizontal mapping matching slide_10_holeplug.jpg
-    function X(x) { return 125 + (x - 238.0) * 1.16; }
-    function W(w) { return w * 1.16; }
+    const slideId = (s && s.id) || 'v3-holeplug-automate';
+    if (app._v3HpLastSlideId !== slideId) {
+      app._v3HpLastSlideId = slideId;
+      app._v3HpManualFocus = null;
+    }
+    if (app.isPlaying) app._v3HpManualFocus = null;
 
-    // 1. Background
-    if (typeof ctx.createLinearGradient === 'function') {
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, 1080);
-      bgGrad.addColorStop(0.00, '#0f1412');
-      bgGrad.addColorStop(0.18, '#3f564d');
-      bgGrad.addColorStop(0.60, '#6a9d8c');
-      bgGrad.addColorStop(1.00, '#8dd1be');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, 1920, 1080);
-    } else {
-      ctx.fillStyle = '#537367';
-      ctx.fillRect(0, 0, 1920, 1080);
+    app._v3HpHits = [];
+    if (app.canvas && !app.canvas._v3Slide11ClickAttached) {
+      app.canvas._v3Slide11ClickAttached = true;
+      app.canvas.addEventListener('click', (e) => {
+        const cur = app.slides && app.slides[app.activeSlideIndex];
+        if (!cur || (cur.id !== 'v3-holeplug-automate' && cur.layout !== 'holeplug-automate-full') || !Array.isArray(app._v3HpHits)) return;
+        const rect = app.canvas.getBoundingClientRect();
+        if (!rect || !rect.width || !rect.height) return;
+        const cx = (e.clientX - rect.left) * (1920 / rect.width);
+        const cy = (e.clientY - rect.top) * (1080 / rect.height);
+        for (const hit of app._v3HpHits) {
+          if (cx >= hit.x && cx <= hit.x + hit.w && cy >= hit.y && cy <= hit.y + hit.h) {
+            app._v3HpManualFocus = (app._v3HpManualFocus === hit.idx) ? null : hit.idx;
+            if (app.isPlaying && typeof app.seekTo === 'function' && hit.seekT !== undefined) {
+              const slideStart = typeof app.getSlideStartTime === 'function' ? app.getSlideStartTime(app.activeSlideIndex) : 0;
+              app.seekTo(slideStart + hit.seekT);
+            } else if (typeof app.render === 'function') {
+              app.render();
+            }
+            return;
+          }
+        }
+      });
     }
 
-    // 2. Top Header Banner (SP id=41 & 42)
+    // 1. Theme-Aware Studio Canvas & Architectural Grid (Matches V4 Slide 10 Aesthetic)
+    const pal = (typeof app.getCustomBackgroundPalette === 'function')
+      ? app.getCustomBackgroundPalette('mint')
+      : {
+          preset: 'default', isDark: false,
+          stops: ['#141a18', '#466157', '#72ab99', '#8dd1be'],
+          cardFill: 'rgba(255, 255, 255, 0.96)', cardBorder: '#fe9457',
+          titleColor: '#ffffff', ink: '#0f172a', muted: '#475569',
+          gridColor: 'rgba(255, 255, 255, 0.06)'
+        };
+    const isCardDark = pal.preset === 'emerald-dark' || pal.preset === 'blueprint' || (pal.preset === 'custom' && pal.isDark);
+
+    if (typeof ctx.createLinearGradient === 'function') {
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, 1080);
+      const stops = pal.stops || ['#141a18', '#466157', '#72ab99'];
+      stops.forEach((col, i) => bgGrad.addColorStop(i / Math.max(1, stops.length - 1), col));
+      ctx.fillStyle = bgGrad;
+    } else {
+      ctx.fillStyle = (pal.stops && pal.stops[0]) || '#466157';
+    }
+    ctx.fillRect(0, 0, 1920, 1080);
+
+    if (typeof ctx.beginPath === 'function') {
+      ctx.save();
+      ctx.strokeStyle = pal.gridColor || 'rgba(255, 255, 255, 0.055)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let gx = 0; gx < 1920; gx += 48) { ctx.moveTo(gx, 0); ctx.lineTo(gx, 1080); }
+      for (let gy = 0; gy < 1080; gy += 48) { ctx.moveTo(0, gy); ctx.lineTo(1920, gy); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Clean Top Header Bar (y = 8..94)
     const pHead = easeOut(t / 0.45);
     ctx.save();
     ctx.globalAlpha = pHead;
     if (typeof ctx.createLinearGradient === 'function') {
-      const topBan = ctx.createLinearGradient(0, 38, 1920, 38);
-      topBan.addColorStop(0.00, 'rgba(68, 94, 84, 0.95)');
-      topBan.addColorStop(0.72, 'rgba(78, 106, 95, 0.85)');
-      topBan.addColorStop(1.00, 'rgba(78, 106, 95, 0.10)');
+      const topBan = ctx.createLinearGradient(0, 10, 1920, 10);
+      if (pal.preset === 'washi' || pal.preset === 'white' || pal.preset === 'sage' || (pal.preset === 'custom' && !pal.isDark)) {
+        topBan.addColorStop(0.00, 'rgba(255, 255, 255, 0.92)');
+        topBan.addColorStop(0.55, 'rgba(241, 248, 245, 0.94)');
+        topBan.addColorStop(1.00, 'rgba(255, 255, 255, 0.80)');
+      } else {
+        topBan.addColorStop(0.00, 'rgba(15, 38, 30, 0.94)');
+        topBan.addColorStop(0.65, 'rgba(28, 63, 52, 0.90)');
+        topBan.addColorStop(1.00, 'rgba(28, 63, 52, 0.38)');
+      }
       ctx.fillStyle = topBan;
     } else {
-      ctx.fillStyle = '#486258';
+      ctx.fillStyle = isCardDark ? '#1a382e' : '#0f261e';
     }
-    ctx.fillRect(0, 38, 1920, 96);
+    ctx.fillRect(0, 10, 1920, 84);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.font = '800 46px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('NEW Automate Process', 925, 76);
-    ctx.font = '700 22px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Automate of Hole Plug & Switch_Hood [Interior Wall / Partition]', 965, 110);
-    ctx.textAlign = 'left';
+    // Left Topic Tag Pill
+    const isLightHeader = (pal.preset === 'washi' || pal.preset === 'white' || pal.preset === 'sage' || (pal.preset === 'custom' && !pal.isDark));
+    ctx.fillStyle = isLightHeader ? 'rgba(15, 118, 110, 0.12)' : 'rgba(133, 220, 201, 0.14)';
+    rrect(28, 32, 272, 38, 19);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = isLightHeader ? 'rgba(15, 118, 110, 0.45)' : 'rgba(133, 220, 201, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    ctx.fillStyle = isLightHeader ? '#0F5E4E' : '#85DCC9';
+    fit('PLUG & SWITCH · AUTO 7 STEPS', 164, 56, 250, 13.5, '800', '"Prompt", sans-serif', 'center');
+
+    // Centered Main Title & Subtitle
+    ctx.fillStyle = pal.titleColor || '#FFFFFF';
+    fit('NEW Automate Process', 960, 46, 760, 40, '800', '"Prompt", "Segoe UI", sans-serif', 'center');
+    ctx.fillStyle = isLightHeader ? '#0F5E4E' : '#85DCC9';
+    fit('Automate of Hole Plug & Switch_Hood [Interior Wall / Partition]', 960, 77, 940, 20, '600', '"Prompt", "Segoe UI", sans-serif', 'center');
+
+    // Right Status Pill (left of Page Badge)
+    const pulseDot = 0.5 + 0.5 * Math.sin(nowSec * 4.5);
+    ctx.fillStyle = isLightHeader ? 'rgba(16, 185, 129, 0.14)' : 'rgba(16, 185, 129, 0.18)';
+    rrect(1446, 33, 232, 36, 18);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.55)';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
+    if (typeof ctx.arc === 'function') {
+      ctx.beginPath();
+      ctx.arc(1468, 51, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
+      ctx.fill();
+    }
+    ctx.fillStyle = isLightHeader ? '#065F46' : '#6EE7B7';
+    fit('LIVE 7-STEP AUTOMATION', 1572, 56, 190, 13, '800', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     drawPageBadge(ctx, app);
 
-    // Helper: Mint-Green Step Pill with Orange Border (#1..#7)
-    function drawStepPill(bx, by, bw, bh, labelText, alpha) {
+    // 3. Outer Studio Stage Container (x=24..1896, y=104..1060)
+    const pStage = easeOut((t - 0.05) / 0.4);
+    ctx.save();
+    ctx.globalAlpha = pStage;
+    ctx.save();
+    ctx.shadowColor = isCardDark ? 'rgba(0, 0, 0, 0.36)' : 'rgba(15, 23, 42, 0.14)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+    if (typeof ctx.createLinearGradient === 'function') {
+      const cardGrad = ctx.createLinearGradient(24, 104, 1896, 1060);
+      if (pal.preset === 'washi') {
+        cardGrad.addColorStop(0, '#faf7ee'); cardGrad.addColorStop(1, '#f3efe2');
+      } else if (pal.preset === 'sage') {
+        cardGrad.addColorStop(0, '#e2f3ea'); cardGrad.addColorStop(1, '#eef8f3');
+      } else if (pal.preset === 'emerald-dark') {
+        cardGrad.addColorStop(0, '#0f231c'); cardGrad.addColorStop(1, '#163128');
+      } else if (pal.preset === 'blueprint') {
+        cardGrad.addColorStop(0, '#0f2238'); cardGrad.addColorStop(1, '#163150');
+      } else if (pal.preset === 'custom') {
+        cardGrad.addColorStop(0, pal.stops[0] || '#f8fafc');
+        cardGrad.addColorStop(1, pal.stops[pal.stops.length - 1] || '#eef2f6');
+      } else if (pal.preset === 'white') {
+        cardGrad.addColorStop(0, '#ffffff'); cardGrad.addColorStop(1, '#f8fafc');
+      } else {
+        cardGrad.addColorStop(0.0, '#eaf6f1');
+        cardGrad.addColorStop(0.2, '#ffffff');
+        cardGrad.addColorStop(1.0, '#f5faf8');
+      }
+      ctx.fillStyle = cardGrad;
+    } else {
+      ctx.fillStyle = isCardDark ? '#132820' : '#ffffff';
+    }
+    rrect(24, 104, 1872, 956, 28);
+    if (typeof ctx.beginPath === 'function') {
+      ctx.fill();
+      ctx.strokeStyle = pal.preset === 'default' ? '#FE9457' : (pal.cardBorder || '#10B981');
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.fillRect(24, 104, 1872, 956);
+    }
+    ctx.restore();
+    ctx.restore();
+
+    // Active spotlight step synced with playback cues (or manual click)
+    const activeStep = (typeof app._v3HpManualFocus === 'number')
+      ? app._v3HpManualFocus
+      : (app.isPlaying
+          ? (t < 14 ? -1 : (t < 32.5 ? Math.floor(((t - 14) / 18.5) * 4) % 4 : (4 + (Math.floor(((t - 32.5) / 17.5) * 3) % 3))))
+          : Math.floor((nowSec / 3.6) % 7));
+
+    // Shared 4-Column Swiss Grid Metrics (x=48..1870 -> total 1822px)
+    const colGap = 18;
+    const colW = 442;
+    const colX = (i) => 48 + i * (colW + colGap); // [48, 508, 968, 1428]
+
+    // Helper: Mint-Green Step Pill Badge with Coral Outline
+    function drawStepPill(bx, by, bw, bh, labelText, alpha, isLit) {
       ctx.save();
       ctx.globalAlpha = alpha;
-      const r = bh / 2;
-      ctx.fillStyle = '#82cba9';
-      ctx.strokeStyle = '#fe9457';
-      ctx.lineWidth = 2.0;
+      ctx.fillStyle = isLit ? '#059669' : '#B9E2D5';
+      ctx.strokeStyle = isLit ? '#34D399' : '#FE9457';
+      ctx.lineWidth = isLit ? 2.4 : 1.8;
+      rrect(bx, by, bw, bh, bh / 2);
       if (typeof ctx.beginPath === 'function') {
-        ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(bx, by, bw, bh, r);
-        } else {
-          ctx.rect(bx, by, bw, bh);
-        }
-        ctx.closePath();
         ctx.fill();
         ctx.stroke();
       } else {
         ctx.fillRect(bx, by, bw, bh);
       }
-      ctx.fillStyle = '#0f1714';
-      ctx.textAlign = 'center';
-      ctx.font = '800 21px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText(labelText, bx + bw / 2, by + bh / 2 + 7);
-      ctx.textAlign = 'left';
+      ctx.fillStyle = isLit ? '#FFFFFF' : '#10241E';
+      fit(labelText, bx + bw / 2, by + bh / 2 + 6, bw - 24, 19.5, '800', '"Prompt", "Segoe UI", sans-serif', 'center');
       ctx.restore();
     }
 
-    // 3. Top Row: Toolbar Group 17 + Periwinkle Capsule (SP id=39)
-    const pTop = easeOut((t - 0.15) / 0.45);
+    // Helper: Outer Uniform Step Card Frame
+    function drawCardShell(cx, cy, cw, ch, isLit, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = isLit ? 'rgba(5, 150, 105, 0.25)' : 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = isLit ? 20 : 12;
+      ctx.shadowOffsetY = isLit ? 6 : 4;
+      ctx.fillStyle = isCardDark ? 'rgba(30, 41, 59, 0.88)' : '#FFFFFF';
+      ctx.strokeStyle = isLit ? '#10B981' : (isCardDark ? 'rgba(148, 163, 184, 0.28)' : '#CBD5E1');
+      ctx.lineWidth = isLit ? 2.6 : 1.3;
+      rrect(cx, cy, cw, ch, 18);
+      if (typeof ctx.beginPath === 'function') {
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(cx, cy, cw, ch);
+      }
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 4. ROW 1: BALANCED 50/50 TOP BAR (Toolbar Left [48..950] + Goals Right [968..1870])
+    // =========================================================================
+    const topY = 118;
+    const topH = 114;
+    const pTop = easeOut((t - 0.12) / 0.42);
+    const barW = colW * 2 + colGap; // 902px exact!
+
     ctx.save();
     ctx.globalAlpha = pTop;
 
-    // Toolbar Rounded Box (X(248.3), 182, W(681.3), 120)
-    ctx.fillStyle = '#e5e7eb';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.0;
+    // 4A. Left Command Bar (48..950)
+    const tbX = colX(0);
+    ctx.fillStyle = isCardDark ? 'rgba(255, 255, 255, 0.06)' : '#EEF2F6';
+    ctx.strokeStyle = isCardDark ? 'rgba(148, 163, 184, 0.30)' : '#CBD5E1';
+    ctx.lineWidth = 1.6;
+    rrect(tbX, topY, barW, topH, 20);
     if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(X(248.3), 182, W(681.3), 120, 20);
-      } else {
-        ctx.rect(X(248.3), 182, W(681.3), 120);
-      }
-      ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillRect(X(248.3), 182, W(681.3), 120);
+      ctx.fillRect(tbX, topY, barW, topH);
     }
 
-    // 8 Toolbar Icons
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_28_image60.png', X(260.7), 192, W(41.4), 68, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_21_image53.png', X(326.9), 194, W(72.4), 68, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_22_image54.png', X(408.6), 195, W(72.4), 66, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_23_image55.png', X(491.2), 192, W(74.1), 68, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_24_image56.png', X(575.0), 193, W(74.1), 67, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_27_image59.png', X(654.7), 192, W(72.0), 65, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_25_image57.png', X(736.3), 191, W(70.9), 67, null, 0, pTop);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_26_image58.png', X(819.2), 188, W(86.2), 66, null, 0, pTop);
+    const tbIcons = [
+      { n: '#1', src: 'assets/ver3/slide11_holeplug/pic_28_image60.png', seekT: 14.0 },
+      { n: '#2', src: 'assets/ver3/slide11_holeplug/pic_21_image53.png', seekT: 18.5 },
+      { n: '#3', src: 'assets/ver3/slide11_holeplug/pic_22_image54.png', seekT: 23.0 },
+      { n: '#4', src: 'assets/ver3/slide11_holeplug/pic_23_image55.png', seekT: 27.5 },
+      { n: '#5', src: 'assets/ver3/slide11_holeplug/pic_24_image56.png', seekT: 32.5 },
+      { n: '#6', src: 'assets/ver3/slide11_holeplug/pic_27_image59.png', seekT: 38.0 },
+      { n: '#7', src: 'assets/ver3/slide11_holeplug/pic_25_image57.png', seekT: 43.5 }
+    ];
 
-    // #1..#7 labels inside toolbar
-    const tbNums = ['#1', '#2', '#3', '#4', '#5', '#6', '#7'];
-    const tbXs = [278, 355, 438, 522, 605, 688, 772];
-    ctx.fillStyle = '#0f1714';
-    ctx.font = '700 20px "Prompt", "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    tbNums.forEach((n, idx) => {
-      ctx.fillText(n, X(tbXs[idx]), 286);
+    const tileW = 74;
+    const tileH = 66;
+    const tileStep = 96;
+    const tileStartX = tbX + 28;
+    const tileY = topY + 10;
+
+    tbIcons.forEach((ic, idx) => {
+      const ix = tileStartX + idx * tileStep;
+      const isLit = activeStep === idx;
+      drawAspectImage(ctx, ic.src, ix, tileY, tileW, tileH, {
+        alpha: pTop,
+        radius: 12,
+        pad: 6,
+        bgColor: '#FFFFFF',
+        borderColor: isLit ? '#10B981' : '#CBD5E1',
+        borderWidth: isLit ? 2.6 : 1.2
+      });
+
+      ctx.fillStyle = isLit ? '#059669' : (isCardDark ? 'rgba(255,255,255,0.12)' : '#E2E8F0');
+      rrect(ix + 11, topY + 82, tileW - 22, 22, 11);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = isLit ? '#FFFFFF' : (isCardDark ? '#E2E8F0' : '#0F172A');
+      fit(ic.n, ix + tileW / 2, topY + 98, 44, 15, '800', '"Prompt", sans-serif', 'center');
+
+      app._v3HpHits.push({ x: ix, y: topY + 4, w: tileW, h: topH - 8, idx, seekT: ic.seekT });
     });
-    ctx.textAlign = 'left';
 
-    // Arrow after #7 (X(804) to X(884) at y=280)
+    // Flow arrow from #7 -> Final File Upload icon
+    const arrStartX = tileStartX + 6 * tileStep + tileW + 12;
+    const uploadX = arrStartX + 76;
     if (typeof ctx.beginPath === 'function') {
-      ctx.strokeStyle = '#52525b';
-      ctx.lineWidth = 3.0;
+      ctx.strokeStyle = isCardDark ? '#94A3B8' : '#475569';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(X(804), 280);
-      ctx.lineTo(X(876), 280);
+      ctx.moveTo(arrStartX, topY + 44);
+      ctx.lineTo(uploadX - 18, topY + 44);
       ctx.stroke();
-      ctx.fillStyle = '#52525b';
+      ctx.fillStyle = isCardDark ? '#94A3B8' : '#475569';
       ctx.beginPath();
-      ctx.moveTo(X(886), 280);
-      ctx.lineTo(X(872), 273);
-      ctx.lineTo(X(872), 287);
+      ctx.moveTo(uploadX - 8, topY + 44);
+      ctx.lineTo(uploadX - 22, topY + 37);
+      ctx.lineTo(uploadX - 22, topY + 51);
       ctx.closePath();
       ctx.fill();
     }
 
-    // Top-Right Periwinkle Capsule (SP id=39: X(955.0), 168, W(711.8), 152)
-    const capX = X(955.0), capY = 168, capW = W(711.8), capH = 152, capR = 76;
-    ctx.fillStyle = '#93a6d6';
-    ctx.strokeStyle = '#fe9457';
-    ctx.lineWidth = 2.4;
+    drawAspectImage(ctx, 'assets/ver3/slide11_holeplug/pic_26_image58.png', uploadX, tileY, 86, tileH, {
+      alpha: pTop,
+      radius: 12,
+      pad: 6,
+      bgColor: '#FFFFFF',
+      borderColor: activeStep === 6 ? '#EF4444' : '#FCA5A5',
+      borderWidth: activeStep === 6 ? 2.4 : 1.4
+    });
+    ctx.fillStyle = isCardDark ? '#FCA5A5' : '#991B1B';
+    fit('File Upload', uploadX + 43, topY + 98, 86, 13.5, '800', '"Prompt", sans-serif', 'center');
+
+    // 4B. Right Impact Goals Capsule (968..1870, exact same 902 x 114 size)
+    const capX = colX(2);
+    if (typeof ctx.createLinearGradient === 'function') {
+      const capGrad = ctx.createLinearGradient(capX, topY, capX + barW, topY + topH);
+      capGrad.addColorStop(0.0, '#6B7FD4');
+      capGrad.addColorStop(1.0, '#8598DF');
+      ctx.fillStyle = capGrad;
+    } else {
+      ctx.fillStyle = '#7C90D6';
+    }
+    ctx.strokeStyle = '#FE9457';
+    ctx.lineWidth = 2.2;
+    rrect(capX, topY, barW, topH, 57);
     if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(capX, capY, capW, capH, capR);
-      } else {
-        ctx.rect(capX, capY, capW, capH);
-      }
-      ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillRect(capX, capY, capW, capH);
+      ctx.fillRect(capX, topY, barW, topH);
     }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '500 31px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('1. ลด loss เนื่องจาก Human error', capX + 42, capY + 60);
-    ctx.fillText('2. ลดเวลาจาก Manual', capX + 42, capY + 116);
+    // Two Clean Goal Rows inside Right Capsule
+    const goals = [
+      { n: '1', text: 'ลด Loss เนื่องจาก Human Error', tag: 'เจาะตรงตำแหน่ง & ขนาดแม่นยำ' },
+      { n: '2', text: 'ลดเวลาทำงานจาก Manual', tag: 'Automation 7 ขั้นตอนครบวงจร' }
+    ];
+    goals.forEach((g, gi) => {
+      const gy = topY + 34 + gi * 46;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.24)';
+      rrect(capX + 38, gy - 16, 30, 30, 15);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      fit(g.n, capX + 53, gy + 5, 22, 16, '900', '"Prompt", sans-serif', 'center');
+      fit(g.text, capX + 82, gy + 6, 460, 23, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.20)';
+      rrect(capX + barW - 292, gy - 15, 250, 28, 14);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = '#E0F2FE';
+      fit(g.tag, capX + barW - 167, gy + 4, 232, 13.5, '600', '"Prompt", sans-serif', 'center');
+    });
     ctx.restore();
 
-    // 4. Middle Row: Steps #1, #2, #3, #4
-    const pMid = easeOut((t - 0.28) / 0.5);
-    // Step #1
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_3_image50.png', X(246.3), 342, W(337.8), 198, '#fe9457', 2.0, pMid);
-    drawStepPill(X(238.0), 564, W(349.0), 37, '#1 Set up CAD layers', pMid);
+    // =========================================================================
+    // 5. ROW 2: 4 EQUAL PROPORTION CARDS (#1, #2, #3, #4) (y=246..614, h=368)
+    // =========================================================================
+    const midY = 246;
+    const midH = 368;
+    const pMid = easeOut((t - 0.24) / 0.48);
 
-    // Step #2
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_31_image63.png', X(637.3), 342, W(317.1), 198, '#fe9457', 2.0, pMid);
-    drawStepPill(X(603.5), 564, W(381.1), 37, '#2 Import CAD into SketchUp', pMid);
+    const midCards = [
+      { idx: 0, title: '#1 Set up CAD layers', img: 'assets/ver3/slide11_holeplug/pic_3_image50.png', wellBg: '#0F172A', seekT: 14.0 },
+      { idx: 1, title: '#2 Import CAD into SketchUp', img: 'assets/ver3/slide11_holeplug/pic_31_image63.png', wellBg: '#FFFFFF', seekT: 18.5 },
+      { idx: 2, title: '#3 Auto-detect Height', img: 'assets/ver3/slide11_holeplug/pic_8_image51.png', wellBg: '#FFFFFF', seekT: 23.0, highlightH700: true },
+      { idx: 3, title: '#4 Auto Punching', img: 'assets/ver3/slide11_holeplug/pic_11_image52.png', wellBg: '#FFFFFF', seekT: 27.5 }
+    ];
 
-    // Step #3 (Group 6 with 2 orange callout rectangles)
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_8_image51.png', X(1027.9), 342, W(321.6), 198, '#fe9457', 2.0, pMid);
-    ctx.save();
-    ctx.globalAlpha = pMid;
-    ctx.strokeStyle = '#fe9457';
-    ctx.lineWidth = 2.2;
-    ctx.strokeRect(X(1063.5), 356, W(45.1), 18);
-    ctx.strokeRect(X(1063.3), 498, W(45.1), 18);
-    ctx.restore();
-    drawStepPill(X(1022.6), 564, W(330.0), 37, '#3 Auto-detect Height', pMid);
+    midCards.forEach((mc, i) => {
+      const cx = colX(i);
+      const isLit = activeStep === mc.idx;
+      drawCardShell(cx, midY, colW, midH, isLit, pMid);
 
-    // Step #4
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_11_image52.png', X(1393.2), 340, W(255.7), 202, '#fe9457', 2.0, pMid);
-    drawStepPill(X(1382.0), 564, W(278.1), 37, '#4 Auto Punching', pMid);
+      const frameX = cx + 12;
+      const frameY = midY + 12;
+      const frameW = colW - 24; // 418
+      const frameH = 290;
 
-    // 5. Bottom Row: Steps #5, #6, #7
-    const pBot = easeOut((t - 0.42) / 0.55);
-    // Step #5
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_38_image67.png', X(244.3), 662, W(139.9), 308, '#fe9457', 1.6, pBot);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_37_image66.png', X(399.3), 660, W(173.4), 310, '#fe9457', 1.6, pBot);
-    drawStepPill(X(245.7), 998, W(392.2), 37, '#5 Generate 2D Auto Rotate', pBot);
+      drawAspectImage(ctx, mc.img, frameX, frameY, frameW, frameH, {
+        alpha: pMid,
+        radius: 12,
+        pad: 6,
+        bgColor: mc.wellBg,
+        borderColor: isLit ? '#10B981' : '#E2E8F0',
+        borderWidth: 1.4
+      });
 
-    // Step #6 (4 overlapping images)
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_29_image61.png', X(649.1), 662, W(428.5), 308, '#fe9457', 1.6, pBot);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_32_image64.png', X(1057.3), 638, W(230.8), 175, '#fe9457', 1.6, pBot);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_30_image62.png', X(1056.7), 828, W(106.8), 122, '#fe9457', 1.6, pBot);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_33_image65.png', X(1137.7), 844, W(150.6), 92, '#fe9457', 1.6, pBot);
-    drawStepPill(X(682.0), 998, W(526.1), 37, '#6 Generate 3D Auto (Check Accuracy)', pBot);
+      // Exact aligned orange callout boxes over H=700 inside #3
+      if (mc.highlightH700) {
+        const im3 = loadImage(mc.img);
+        if (im3 && im3.complete && im3.naturalWidth > 0 && im3.naturalHeight > 0) {
+          const maxW = frameW - 12;
+          const maxH = frameH - 12;
+          const sc = Math.min(maxW / im3.naturalWidth, maxH / im3.naturalHeight);
+          const dw = im3.naturalWidth * sc;
+          const dh = im3.naturalHeight * sc;
+          const dx = frameX + (frameW - dw) / 2;
+          const dy = frameY + (frameH - dh) / 2;
+          ctx.save();
+          ctx.globalAlpha = pMid * (0.75 + 0.25 * Math.sin(nowSec * 3.5));
+          ctx.strokeStyle = '#EA580C';
+          ctx.lineWidth = 2.4;
+          ctx.strokeRect(dx + dw * 0.115, dy + dh * 0.055, dw * 0.115, dh * 0.095);
+          ctx.strokeRect(dx + dw * 0.115, dy + dh * 0.770, dw * 0.115, dh * 0.095);
+          ctx.restore();
+        }
+      }
 
-    // Step #7 (2 stacked tables)
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_17_image35.png', X(1370.8), 658, W(278.1), 154, '#fe9457', 1.6, pBot);
-    drawPptxImage(ctx, 'assets/ver3/slide11_holeplug/pic_15_image36.png', X(1370.8), 832, W(278.1), 138, '#fe9457', 1.6, pBot);
-    drawStepPill(X(1339.5), 998, W(340.7), 37, '#7 Export Cad & File Up', pBot);
+      drawStepPill(cx + 16, midY + 314, colW - 32, 40, mc.title, pMid, isLit);
+      app._v3HpHits.push({ x: cx, y: midY, w: colW, h: midH, idx: mc.idx, seekT: mc.seekT });
+    });
+
+    // =========================================================================
+    // 6. ROW 3: GRID-ALIGNED BOTTOM CARDS (#5, #6, #7) (y=628..1044, h=416)
+    // =========================================================================
+    const botY = 628;
+    const botH = 416;
+    const pBot = easeOut((t - 0.36) / 0.50);
+
+    function drawLabeledFrame(fx, fy, fw, fh, opts) {
+      const { img, bgColor = '#FFFFFF', headerBg = '#F1F5F9', title = '', pill = '', pillColor = '#0F766E', centerPill = false } = opts;
+      ctx.save();
+      ctx.globalAlpha = pBot;
+      ctx.fillStyle = bgColor;
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 1.2;
+      rrect(fx, fy, fw, fh, 12);
+      if (typeof ctx.beginPath === 'function') { ctx.fill(); ctx.stroke(); } else { ctx.fillRect(fx, fy, fw, fh); }
+
+      ctx.fillStyle = headerBg;
+      rrect(fx + 2, fy + 2, fw - 4, 24, 9);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      if (title) {
+        ctx.fillStyle = '#334155';
+        fit(title, fx + 10, fy + 18, fw - 112, 11, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
+      }
+      if (pill) {
+        const pw = centerPill ? Math.min(fw - 20, 96) : 92;
+        const px = centerPill ? fx + (fw - pw) / 2 : fx + fw - pw - 6;
+        ctx.fillStyle = pillColor;
+        rrect(px, fy + 5, pw, 18, 6);
+        if (typeof ctx.beginPath === 'function') ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        fit(pill, px + pw / 2, fy + 17.5, pw - 10, 10.5, '700', '"Prompt", sans-serif', 'center');
+      }
+      ctx.restore();
+      drawAspectImage(ctx, img, fx + 4, fy + 28, fw - 8, fh - 32, { alpha: pBot, radius: 8, pad: 2 });
+    }
+
+    // 6A. Card #5: Generate 2D Auto Rotate (x=48..490, aligned under #1!)
+    {
+      const cx = colX(0);
+      const isLit = activeStep === 4;
+      drawCardShell(cx, botY, colW, botH, isLit, pBot);
+
+      drawLabeledFrame(cx + 12, botY + 12, 192, 342, {
+        img: 'assets/ver3/slide11_holeplug/pic_38_image67.png',
+        bgColor: '#F8FAFC', pill: '3D Panel', pillColor: '#0F172A', centerPill: true
+      });
+      ctx.save();
+      ctx.globalAlpha = pBot;
+      // Rotate Arrow badge between 3D -> 2D
+      ctx.fillStyle = '#059669';
+      rrect(cx + 207, botY + 178, 18, 28, 9);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      fit('➔', cx + 216, botY + 197, 14, 13, '900', '"Prompt", sans-serif', 'center');
+      ctx.restore();
+
+      drawLabeledFrame(cx + 228, botY + 12, 202, 342, {
+        img: 'assets/ver3/slide11_holeplug/pic_37_image66.png',
+        bgColor: '#FFFFFF', pill: '2D Auto', pillColor: '#0369A1', centerPill: true
+      });
+
+      drawStepPill(cx + 16, botY + 364, colW - 32, 38, '#5 Generate 2D Auto Rotate', pBot, isLit);
+      app._v3HpHits.push({ x: cx, y: botY, w: colW, h: botH, idx: 4, seekT: 32.5 });
+    }
+
+    // 6B. Card #6: Generate 3D Auto (Check Accuracy) (x=508..1410, w=902 aligned under #2+#3!)
+    {
+      const cx = colX(1);
+      const cw = colW * 2 + colGap; // 902px exact!
+      const isLit = activeStep === 5;
+      drawCardShell(cx, botY, cw, botH, isLit, pBot);
+
+      // Left Hero 3D Model (zero overlap!)
+      drawAspectImage(ctx, 'assets/ver3/slide11_holeplug/pic_29_image61.png', cx + 12, botY + 12, 492, 342, {
+        alpha: pBot, radius: 12, pad: 6, bgColor: '#FFFFFF', borderColor: isLit ? '#10B981' : '#CBD5E1', borderWidth: 1.4
+      });
+
+      // Right Clean Verification Stack (zero collision!)
+      const subX = cx + 516;
+      const subW = cw - 528; // 374px
+      // Top: Punching Boards UI list
+      drawAspectImage(ctx, 'assets/ver3/slide11_holeplug/pic_32_image64.png', subX, botY + 12, subW, 190, {
+        alpha: pBot, radius: 12, pad: 4, bgColor: '#F8FAFC', borderColor: '#CBD5E1', borderWidth: 1.2
+      });
+      // Bottom Left: 3D Punching Zoom
+      drawAspectImage(ctx, 'assets/ver3/slide11_holeplug/pic_30_image62.png', subX, botY + 212, 174, 142, {
+        alpha: pBot, radius: 12, pad: 4, bgColor: '#F8FAFC', borderColor: '#CBD5E1', borderWidth: 1.2
+      });
+      // Bottom Right: 2D IW-UNIT01 Detail
+      drawAspectImage(ctx, 'assets/ver3/slide11_holeplug/pic_33_image65.png', subX + 184, botY + 212, subW - 184, 142, {
+        alpha: pBot, radius: 12, pad: 4, bgColor: '#FFFFFF', borderColor: '#CBD5E1', borderWidth: 1.2
+      });
+
+      drawStepPill(cx + 150, botY + 364, cw - 300, 38, '#6 Generate 3D Auto (Check Accuracy)', pBot, isLit);
+      app._v3HpHits.push({ x: cx, y: botY, w: cw, h: botH, idx: 5, seekT: 38.0 });
+    }
+
+    // 6C. Card #7: Export Cad & File Up (x=1428..1870, aligned under #4!)
+    {
+      const cx = colX(3);
+      const isLit = activeStep === 6;
+      drawCardShell(cx, botY, colW, botH, isLit, pBot);
+
+      // Top Panel: DWG File Output List
+      drawLabeledFrame(cx + 12, botY + 12, colW - 24, 146, {
+        img: 'assets/ver3/slide11_holeplug/pic_17_image35.png',
+        title: 'DWG Files Output', pill: '.DWG Batch', pillColor: '#0F766E'
+      });
+
+      // Subtle connector badge between DWG -> CSV Database
+      ctx.save();
+      ctx.globalAlpha = pBot;
+      ctx.fillStyle = '#059669';
+      rrect(cx + colW / 2 - 14, botY + 159, 28, 16, 8);
+      if (typeof ctx.beginPath === 'function') ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      fit('▼', cx + colW / 2, botY + 171, 18, 10, '900', '"Prompt", sans-serif', 'center');
+      ctx.restore();
+
+      // Bottom Panel: File Upload CSV Table
+      drawLabeledFrame(cx + 12, botY + 176, colW - 24, 178, {
+        img: 'assets/ver3/slide11_holeplug/pic_15_image36.png',
+        title: 'Database Upload', pill: 'CSV Upload', pillColor: '#DC2626'
+      });
+
+      drawStepPill(cx + 16, botY + 364, colW - 32, 38, '#7 Export Cad & File Up', pBot, isLit);
+      app._v3HpHits.push({ x: cx, y: botY, w: colW, h: botH, idx: 6, seekT: 43.5 });
+    }
   }
 
   function drawSlide7NewWorkflowAllInOne(app, s) {
@@ -4732,18 +5579,27 @@
     const animSec = app.slideElapsed || 0;
     const v2Slides = (typeof window !== 'undefined' && window.VER2_SLIDES) ? window.VER2_SLIDES : (app._v2SlidesCache || []);
 
-    // 1. Full-screen Dark Master Background with Emerald Tint
-    const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
-    bgGrad.addColorStop(0.00, '#0d1613');
-    bgGrad.addColorStop(0.40, '#13231e');
-    bgGrad.addColorStop(0.75, '#19332a');
-    bgGrad.addColorStop(1.00, '#1f4035');
-    ctx.fillStyle = bgGrad;
+    // 1. Master Background adapting to adjustable background theme
+    const pal12 = (typeof app.getCustomBackgroundPalette === 'function')
+      ? app.getCustomBackgroundPalette('dark-emerald')
+      : {
+          preset: 'default', isDark: true,
+          stops: ['#0d1613', '#13231e', '#19332a', '#1f4035'],
+          gridColor: 'rgba(52, 211, 153, 0.05)'
+        };
+    if (typeof ctx.createLinearGradient === 'function') {
+      const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
+      const stops12 = pal12.stops || ['#0d1613', '#13231e', '#19332a', '#1f4035'];
+      stops12.forEach((col, i) => bgGrad.addColorStop(i / Math.max(1, stops12.length - 1), col));
+      ctx.fillStyle = bgGrad;
+    } else {
+      ctx.fillStyle = (pal12.stops && pal12.stops[0]) || '#0d1613';
+    }
     ctx.fillRect(0, 0, 1920, 1080);
 
     // Subtle Architectural Grid Mesh
     ctx.save();
-    ctx.strokeStyle = 'rgba(52, 211, 153, 0.05)';
+    ctx.strokeStyle = pal12.gridColor || 'rgba(52, 211, 153, 0.05)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let gx = 0; gx < 1920; gx += 48) { ctx.moveTo(gx, 0); ctx.lineTo(gx, 1080); }
@@ -4755,7 +5611,7 @@
     // Auto progression per user request:
     // Step 0: 0..10s (holds for 10s)
     // Step 1: 10..130s (plays 2 minutes / 120s)
-    // Step 2: 130..140s (holds for 10s)
+    // Step 2: 130..150s (holds for 20s · 5 deliverables x 4s)
     if (app.canvas && !app.canvas._v3TabListenerAttached) {
       app.canvas._v3TabListenerAttached = true;
       app.canvas.addEventListener('click', (e) => {
@@ -4772,6 +5628,7 @@
                 app.seekTo(slideStart + 0.1);
               } else {
                 app._ver2SubStep = 0;
+                if (typeof app.render === 'function') app.render();
               }
               return;
             }
@@ -4780,6 +5637,7 @@
                 app.seekTo(slideStart + 10.1);
               } else {
                 app._ver2SubStep = 1;
+                if (typeof app.render === 'function') app.render();
               }
               return;
             }
@@ -4788,15 +5646,18 @@
                 app.seekTo(slideStart + 130.1);
               } else {
                 app._ver2SubStep = 2;
+                if (typeof app.render === 'function') app.render();
               }
               return;
             }
             if (cx >= 1310 && cx <= 1510) {
               app.parallelBranchStyle = 'clean-minimal';
+              if (typeof app.render === 'function') app.render();
               return;
             }
             if (cx >= 1520 && cx <= 1700) {
               app.parallelBranchStyle = 'ver2-dark';
+              if (typeof app.render === 'function') app.render();
               return;
             }
           }
@@ -4941,6 +5802,7 @@
     ctx.clip();
 
     // 4. Render Active Ver 2 Scene inside full-width stageBox
+    app._ver2ActiveStep = activeStep;
     const activeSlide = (v2Slides && v2Slides[activeStep]) ? v2Slides[activeStep] : s;
     if (activeStep === 0) {
       if (typeof app.drawParallelBranchSplitScene === 'function') {
@@ -4951,7 +5813,9 @@
         app.drawBoqSkuExtrusionScene(ctx, stageBox, activeSlide, animSec - 10, nowSec);
       }
     } else if (activeStep === 2) {
-      if (typeof app.drawAutomationDeliverablesSummaryScene === 'function') {
+      if (typeof app.drawDeliverablesShowcaseScene === 'function') {
+        app.drawDeliverablesShowcaseScene(ctx, stageBox, activeSlide, animSec - 130, nowSec);
+      } else if (typeof app.drawAutomationDeliverablesSummaryScene === 'function') {
         app.drawAutomationDeliverablesSummaryScene(ctx, stageBox, activeSlide, animSec - 130, nowSec);
       }
     }
@@ -6078,10 +6942,651 @@
     ctx.restore();
   }
 
+  function drawSlide13ResultClips(ctx, app, x, y, w, h, clipT, nowSec, pal, helpers) {
+    const { clamp, easeOutCubic, drawRoundedRect, fit } = helpers;
+    const clipIdx = clipT < 5.0 ? 0 : (clipT < 10.0 ? 1 : 2);
+    const localT = clamp(clipT - clipIdx * 5.0, 0, 5.0);
+    const fadeIn = easeOutCubic(localT / 0.28);
+    const fadeOut = localT > 4.72 ? clamp((5.0 - localT) / 0.28, 0, 1) : 1;
+    const stageAlpha = Math.min(fadeIn, fadeOut);
+
+    const metaList = [
+      { code: 'CLIP 01 / 03', title: 'LEAD TIME COMPRESSION : 7 DAYS MANUAL ➔ 1 DAY ENGINE', accent: '#10B981', soft: '#064E3B', pill: '7d ➔ 1d' },
+      { code: 'CLIP 02 / 03', title: 'CYCLE TIME SAVER : ลดเวลาทำงานออกแบบ & BOM รวม 86%', accent: '#F59E0B', soft: '#451A03', pill: '86% Saved' },
+      { code: 'CLIP 03 / 03', title: 'ANNUAL COST REDUCTION : ประหยัดต้นทุนรวม 1.2M THB / YEAR', accent: '#34D399', soft: '#065F46', pill: '1.2M THB' }
+    ];
+    const meta = metaList[clipIdx];
+
+    ctx.save();
+    // Clip Viewport Outer Shell
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+    const shellGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+    shellGrad.addColorStop(0.0, '#091B16');
+    shellGrad.addColorStop(0.55, '#0F2A22');
+    shellGrad.addColorStop(1.0, '#0B1D27');
+    drawRoundedRect(x, y, w, h, 18, shellGrad, meta.accent + 'CC', 1.8);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Clip Inner CAD Grid
+    ctx.save();
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, 18);
+    else ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let gx = x + 32; gx < x + w; gx += 44) { ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); }
+    for (let gy = y + 32; gy < y + h; gy += 44) { ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); }
+    ctx.stroke();
+
+    // Top Chrome Bar (h = 54)
+    const barH = 54;
+    ctx.fillStyle = 'rgba(5, 14, 12, 0.72)';
+    ctx.fillRect(x, y, w, barH);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fillRect(x, y + barH - 1, w, 1);
+
+    // Left Live Pill + Animated Dot
+    const pulseDot = 0.45 + 0.55 * Math.sin(nowSec * 6.5);
+    drawRoundedRect(x + 20, y + 13, 134, 28, 14, meta.accent + '26', meta.accent + 'AA', 1.1);
+    ctx.fillStyle = meta.accent;
+    ctx.beginPath();
+    ctx.arc(x + 35, y + 27, 4.2 + pulseDot * 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    fit(meta.code, x + 95, y + 31, 96, 11.5, '800', '"JetBrains Mono", monospace', 'center');
+
+    // Clip Title
+    ctx.fillStyle = '#F8FAFC';
+    fit(meta.title, x + 168, y + 32, 548, 15.5, '800', '"Prompt", sans-serif', 'left');
+
+    // Right Countdown + Clickable Phase Tabs
+    const remSec = Math.max(0, 5.0 - localT).toFixed(1);
+    drawRoundedRect(x + 730, y + 13, 86, 28, 14, 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.2)', 1);
+    ctx.fillStyle = '#A7F3D0';
+    fit(`⏱ ${remSec}s`, x + 773, y + 31, 74, 12, '800', '"JetBrains Mono", monospace', 'center');
+
+    const tabs = [
+      { label: '01 · 7→1d', targetT: 0.05, idx: 0, w: 78 },
+      { label: '02 · 86%', targetT: 5.05, idx: 1, w: 74 },
+      { label: '03 · 1.2M', targetT: 10.05, idx: 2, w: 78 },
+      { label: 'รูปที่ 2 ▶', targetT: 15.05, idx: 3, w: 96 }
+    ];
+    let tx = x + 826;
+    tabs.forEach((tb) => {
+      const active = clipIdx === tb.idx;
+      drawRoundedRect(tx, y + 13, tb.w, 28, 14, active ? meta.accent : 'rgba(255,255,255,0.07)', active ? '#FFFFFF' : 'rgba(255,255,255,0.18)', 1);
+      ctx.fillStyle = active ? '#062019' : '#CBD5E1';
+      fit(tb.label, tx + tb.w / 2, y + 31, tb.w - 10, 11.5, '800', '"Prompt", sans-serif', 'center');
+      app._v3ResultsHits.push({ x: tx, y: y + 13, w: tb.w, h: 28, targetT: tb.targetT });
+      tx += tb.w + 6;
+    });
+
+    // Main Clip Canvas Area (y + 62 .. y + h - 46)
+    const stageX = x + 24;
+    const stageY = y + 66;
+    const stageW = w - 48;
+    const stageH = h - 118;
+
+    ctx.save();
+    ctx.globalAlpha = ctx.globalAlpha * stageAlpha;
+
+    if (clipIdx === 0) {
+      // === CLIP 1 (0..5s): LEAD TIME COMPRESSION 7 DAYS -> 1 DAY ===
+      const p1 = clamp(localT / 5.0, 0, 1);
+      const waveP = easeOutCubic(clamp((localT - 1.0) / 2.3, 0, 1));
+
+      // Section Label Top
+      drawRoundedRect(stageX, stageY, 376, 28, 8, 'rgba(239, 68, 68, 0.16)', 'rgba(248, 113, 113, 0.45)', 1);
+      ctx.fillStyle = '#FCA5A5';
+      fit('BEFORE · MANUAL WORKFLOW (7 WORK DAYS · 56 HRS)', stageX + 188, stageY + 18, 354, 11.5, '800', '"Prompt", sans-serif', 'center');
+
+      drawRoundedRect(stageX + stageW - 224, stageY, 224, 28, 8, waveP > 0.5 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.18)', waveP > 0.5 ? '#10B981' : '#F59E0B', 1);
+      ctx.fillStyle = waveP > 0.5 ? '#6EE7B7' : '#FDE68A';
+      fit(waveP > 0.5 ? '✓ -6 DAYS ELIMINATED' : '⚡ ANALYZING BOTTLENECKS', stageX + stageW - 112, stageY + 18, 204, 11.5, '800', '"Prompt", sans-serif', 'center');
+
+      const days = [
+        { d: 'DAY 1', l1: 'แปลนสถาปัตย์', l2: '& กฎ P-Rule' },
+        { d: 'DAY 2', l1: 'ขึ้นโมเดล C75', l2: 'ทีละผนังเอง' },
+        { d: 'DAY 3', l1: 'วัดเจาะช่อง EE', l2: 'ปลั๊ก/สวิตช์' },
+        { d: 'DAY 4', l1: 'ถอด BOM เหล็ก', l2: 'ลง Excel เอง' },
+        { d: 'DAY 5', l1: 'เขียน 2D Shop', l2: 'Drawing แยกแผง' },
+        { d: 'DAY 6', l1: 'ออก Job Order', l2: '& CNC .DXF' },
+        { d: 'DAY 7', l1: 'Cross-Check', l2: '& แก้แบบซ้ำ' }
+      ];
+      const dayGap = 12;
+      const dayW = (stageW - dayGap * 6) / 7;
+      const dayY = stageY + 38;
+      const dayH = 122;
+
+      // Glowing compression sweep x position (Day 7 -> Day 1)
+      const sweepIdx = 6 - waveP * 5.2;
+
+      days.forEach((item, idx) => {
+        const dx = stageX + idx * (dayW + dayGap);
+        const appearP = easeOutCubic(clamp((localT - idx * 0.11) / 0.35, 0, 1));
+        const eliminated = idx > 0 && idx >= sweepIdx;
+        ctx.save();
+        ctx.globalAlpha *= appearP * (eliminated ? 0.56 : 1);
+        const bgCol = idx === 0 ? 'rgba(16, 185, 129, 0.16)' : (eliminated ? 'rgba(30, 41, 59, 0.52)' : 'rgba(127, 29, 29, 0.32)');
+        const brCol = idx === 0 ? '#10B981' : (eliminated ? '#64748B' : '#F8717188');
+        drawRoundedRect(dx, dayY, dayW, dayH, 12, bgCol, brCol, idx === 0 ? 1.8 : 1.1);
+
+        drawRoundedRect(dx + 10, dayY + 10, 62, 22, 6, idx === 0 ? '#059669' : 'rgba(255,255,255,0.12)', null, 0);
+        ctx.fillStyle = '#FFFFFF';
+        fit(item.d, dx + 41, dayY + 25, 54, 11, '800', '"JetBrains Mono", monospace', 'center');
+
+        if (idx > 0 && !eliminated) {
+          ctx.fillStyle = '#FCA5A5';
+          fit('MANUAL', dx + dayW - 10, dayY + 25, 58, 10, '700', '"JetBrains Mono", monospace', 'right');
+        } else if (idx === 0) {
+          ctx.fillStyle = '#6EE7B7';
+          fit('TARGET', dx + dayW - 10, dayY + 25, 58, 10, '700', '"JetBrains Mono", monospace', 'right');
+        }
+
+        ctx.fillStyle = eliminated ? '#E2E8F0' : '#F1F5F9';
+        fit(item.l1, dx + 10, dayY + 64, dayW - 20, 14, '700', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = eliminated ? '#CBD5E1' : '#CBD5E1';
+        fit(item.l2, dx + 10, dayY + 86, dayW - 20, 13, '500', '"Prompt", sans-serif', 'left');
+
+        if (eliminated) {
+          ctx.strokeStyle = '#EF4444';
+          ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.moveTo(dx + 12, dayY + dayH - 16);
+          ctx.lineTo(dx + dayW - 12, dayY + 40);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+
+      // Compression Wave Beam across Days 2..7
+      if (waveP > 0.04 && waveP < 0.96) {
+        const beamX = stageX + (sweepIdx + 0.5) * (dayW + dayGap);
+        const beamGrad = ctx.createLinearGradient(beamX - 24, 0, beamX + 24, 0);
+        beamGrad.addColorStop(0, 'rgba(16,185,129,0)');
+        beamGrad.addColorStop(0.5, 'rgba(52,211,153,0.75)');
+        beamGrad.addColorStop(1, 'rgba(16,185,129,0)');
+        ctx.fillStyle = beamGrad;
+        ctx.fillRect(Math.max(stageX, beamX - 24), dayY - 4, 48, dayH + 8);
+      }
+
+      // Middle Conduit: OTF Input -> AutoBOM Ruby Engine
+      const midY = stageY + 178;
+      drawRoundedRect(stageX + 218, midY, stageW - 436, 46, 23, 'rgba(6, 78, 59, 0.72)', '#10B981AA', 1.4);
+      ctx.fillStyle = '#ECFDF5';
+      fit('⚡  QHeim_AutoBOM.rb Engine  ·  Single Model 5-Stream Parallel Execution', stageX + stageW / 2, midY + 29, stageW - 476, 15, '800', '"Prompt", sans-serif', 'center');
+
+      // Animated Particle Flow into Bottom Box
+      for (let pi = 0; pi < 5; pi++) {
+        const py = midY + 46 + ((nowSec * 36 + pi * 9) % 24);
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
+        ctx.beginPath();
+        ctx.arc(stageX + stageW / 2 + (pi - 2) * 86, py, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Bottom Hero Box: AFTER DAY 1 AUTOMATED ENGINE
+      const aftY = stageY + 244;
+      const aftH = stageH - 244;
+      drawRoundedRect(stageX, aftY, stageW, aftH, 16, 'rgba(5, 46, 36, 0.78)', '#10B981', 2.0);
+
+      // Left Hero Metric inside After Box
+      const heroW = 340;
+      drawRoundedRect(stageX + 20, aftY + 18, heroW, aftH - 36, 14, 'rgba(6, 95, 70, 0.55)', '#34D39966', 1.2);
+      drawRoundedRect(stageX + 38, aftY + 34, 198, 26, 13, '#10B981', null, 0);
+      ctx.fillStyle = '#052E24';
+      fit('AFTER · DAY 1 READY', stageX + 137, aftY + 51, 180, 11.5, '900', '"Prompt", sans-serif', 'center');
+
+      ctx.fillStyle = '#FFFFFF';
+      fit('1 DAY', stageX + 38, aftY + 124, 190, 56, '900', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#6EE7B7';
+      fit('Engine Run ≤ 2 Min', stageX + 38, aftY + 158, 290, 17, '800', '"JetBrains Mono", monospace', 'left');
+      ctx.fillStyle = '#D1FAE5';
+      fit('ขึ้นโมเดล C75 + ถอด BOM + 2D + CNC พร้อมกัน', stageX + 38, aftY + 188, 304, 13.5, '500', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#A7F3D0';
+      fit('ความเร็วเพิ่มขึ้น 7 เท่า  ·  Zero Human Wait', stageX + 38, aftY + 214, 304, 13, '700', '"Prompt", sans-serif', 'left');
+
+      // Right 5 Automated Streams Completing in Parallel
+      const streams = [
+        { code: '01', name: '3D Visualization (.SKP)', desc: 'C75 Structural Wall + EE Boxes', col: '#10B981' },
+        { code: '02', name: 'Part Items BOM (.XLSX)', desc: 'Auto Material Take-Off -> MRP PO', col: '#F59E0B' },
+        { code: '03', name: 'Job Order Sheet (.PDF)', desc: 'Production Line Picking List S238', col: '#3B82F6' },
+        { code: '04', name: '2D Shop Drawing (.DWG)', desc: 'Auto Wall Assembly Layout (±1mm)', col: '#14B8A6' },
+        { code: '05', name: 'SB List & CNC (.DXF)', desc: 'CAD EE Punching & Bending Path', col: '#A855F7' }
+      ];
+      const stX = stageX + heroW + 38;
+      const stW = stageW - heroW - 58;
+      const rowH = (aftH - 36 - 24) / 5;
+
+      streams.forEach((st, idx) => {
+        const sy = aftY + 18 + idx * (rowH + 6);
+        const prog = easeOutCubic(clamp((localT - 1.15 - idx * 0.32) / 1.15, 0, 1));
+        drawRoundedRect(stX, sy, stW, rowH, 10, 'rgba(15, 23, 42, 0.56)', prog >= 0.98 ? st.col : 'rgba(255,255,255,0.12)', 1.2);
+
+        drawRoundedRect(stX + 10, sy + (rowH - 26) / 2, 34, 26, 7, st.col + '33', st.col, 1);
+        ctx.fillStyle = '#FFFFFF';
+        fit(st.code, stX + 27, sy + rowH / 2 + 5, 28, 12, '900', '"JetBrains Mono", monospace', 'center');
+
+        ctx.fillStyle = '#F8FAFC';
+        fit(st.name, stX + 56, sy + rowH / 2 + 5, 236, 14, '700', '"Prompt", sans-serif', 'left');
+
+        // Animated progress bar
+        const barX = stX + 306;
+        const barW = stW - 432;
+        const barY = sy + rowH / 2 - 4;
+        drawRoundedRect(barX, barY, barW, 8, 4, 'rgba(255,255,255,0.12)', null, 0);
+        if (prog > 0.01) {
+          drawRoundedRect(barX, barY, Math.max(8, barW * prog), 8, 4, st.col, null, 0);
+        }
+
+        if (prog >= 0.98) {
+          drawRoundedRect(stX + stW - 110, sy + (rowH - 26) / 2, 96, 26, 8, 'rgba(16, 185, 129, 0.22)', '#10B981', 1);
+          ctx.fillStyle = '#6EE7B7';
+          fit('✓ READY', stX + stW - 62, sy + rowH / 2 + 5, 84, 11.5, '800', '"JetBrains Mono", monospace', 'center');
+        } else {
+          ctx.fillStyle = '#94A3B8';
+          fit(`${Math.round(prog * 100)}%`, stX + stW - 62, sy + rowH / 2 + 5, 84, 12, '700', '"JetBrains Mono", monospace', 'center');
+        }
+      });
+
+    } else if (clipIdx === 1) {
+      // === CLIP 2 (5..10s): 86% CYCLE TIME SAVER ===
+      const gaugeP = easeOutCubic(clamp(localT / 2.4, 0, 1));
+      const gW = 414;
+      drawRoundedRect(stageX, stageY, gW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(245, 158, 11, 0.55)', 1.5);
+
+      drawRoundedRect(stageX + gW / 2 - 114, stageY + 20, 228, 28, 14, 'rgba(245, 158, 11, 0.18)', '#F59E0B88', 1);
+      ctx.fillStyle = '#FDE68A';
+      fit('OVERALL EFFICIENCY GAIN', stageX + gW / 2, stageY + 38, 206, 11.5, '800', '"Prompt", sans-serif', 'center');
+
+      // Radial Speedometer Arc (cx, cy)
+      const cx = stageX + gW / 2;
+      const cy = stageY + 202;
+      const rad = 122;
+      const startAng = 0.75 * Math.PI;
+      const spanAng = 1.50 * Math.PI;
+      const fillAng = startAng + spanAng * (0.86 * gaugeP);
+
+      // Subtle dashed tick ring
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 10]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad + 22, startAng, startAng + spanAng);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Track Arc
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.lineWidth = 22;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, startAng, startAng + spanAng);
+      ctx.stroke();
+
+      // Active Gradient Arc
+      const arcGrad = ctx.createLinearGradient(cx - rad, cy, cx + rad, cy - rad);
+      arcGrad.addColorStop(0.0, '#F59E0B');
+      arcGrad.addColorStop(0.55, '#10B981');
+      arcGrad.addColorStop(1.0, '#6EE7B7');
+      ctx.strokeStyle = arcGrad;
+      ctx.lineWidth = 22;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, startAng, fillAng);
+      ctx.stroke();
+
+      // Glowing Tip Dot
+      const tipX = cx + Math.cos(fillAng) * rad;
+      const tipY = cy + Math.sin(fillAng) * rad;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#34D399';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // Gauge Center Readout
+      ctx.fillStyle = '#FFFFFF';
+      fit(`${Math.round(86 * gaugeP)}%`, cx, cy + 16, 170, 62, '900', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#6EE7B7';
+      fit('CYCLE TIME SAVED', cx, cy + 48, 170, 13, '800', '"JetBrains Mono", monospace', 'center');
+      ctx.fillStyle = '#CBD5E1';
+      fit('ประหยัดเวลากระบวนการออกแบบรวม', cx, cy + 78, 260, 13.5, '500', '"Prompt", sans-serif', 'center');
+
+      // Bottom Before/After Comparison Boxes inside Gauge Panel
+      const boxY = stageY + stageH - 134;
+      drawRoundedRect(stageX + 20, boxY, 168, 110, 12, 'rgba(127, 29, 29, 0.28)', '#F8717166', 1.1);
+      ctx.fillStyle = '#FCA5A5';
+      fit('MANUAL BASELINE', stageX + 104, boxY + 26, 150, 11, '800', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#FFFFFF';
+      fit('56.0 hrs', stageX + 104, boxY + 64, 150, 26, '900', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#CBD5E1';
+      fit('7 วัน / หลัง (ทำมือทั้งหมด)', stageX + 104, boxY + 90, 150, 11.5, '500', '"Prompt", sans-serif', 'center');
+
+      ctx.fillStyle = '#34D399';
+      fit('➔', stageX + gW / 2, boxY + 62, 26, 20, '900', '"Prompt", sans-serif', 'center');
+
+      drawRoundedRect(stageX + gW - 188, boxY, 168, 110, 12, 'rgba(6, 78, 59, 0.56)', '#34D39988', 1.2);
+      ctx.fillStyle = '#6EE7B7';
+      fit('AUTO BOM SYSTEM', stageX + gW - 104, boxY + 26, 150, 11, '800', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#FFFFFF';
+      fit('7.8 hrs', stageX + gW - 104, boxY + 64, 150, 26, '900', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#D1FAE5';
+      fit('1 วัน / หลัง (-86% รวม QC)', stageX + gW - 104, boxY + 90, 150, 11.5, '500', '"Prompt", sans-serif', 'center');
+
+      // Right Side: 5 Process Workstream Race Bars
+      const rX = stageX + gW + 20;
+      const rW = stageW - gW - 20;
+      drawRoundedRect(rX, stageY, rW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(255,255,255,0.14)', 1.3);
+      ctx.fillStyle = '#FFFFFF';
+      fit('TIME SAVED BY WORKSTREAM — เปรียบเทียบเวลาต่อแบบบ้าน 1 หลัง', rX + 24, stageY + 34, rW - 48, 15.5, '800', '"Prompt", sans-serif', 'left');
+
+      const tracks = [
+        { name: '01 · อ่านแปลน OTF & ตรวจกฎ P-Rule', before: '8.0 hrs', after: '0.5 min', ratio: 0.02, save: '-99%', col: '#10B981' },
+        { name: '02 · ขึ้นโครง 3D C75 & เจาะช่องไฟ EE', before: '16.0 hrs', after: '1.2 min', ratio: 0.03, save: '-99%', col: '#34D399' },
+        { name: '03 · ถอดรายการ Part Items (BOM)', before: '12.0 hrs', after: '0.3 min', ratio: 0.02, save: '-99%', col: '#F59E0B' },
+        { name: '04 · สร้างแบบประกอบ 2D Assembly DWG', before: '12.0 hrs', after: '2.5 hrs (Auto+QC)', ratio: 0.21, save: '-79%', col: '#38BDF8' },
+        { name: '05 · ออก Job Order & SB List (.DXF CNC)', before: '8.0 hrs', after: '0.5 hrs (Auto+QC)', ratio: 0.06, save: '-94%', col: '#A78BFA' }
+      ];
+      const trackGap = 12;
+      const trackStartY = stageY + 54;
+      const trackH = (stageH - 74 - trackGap * 4) / 5;
+
+      tracks.forEach((tr, idx) => {
+        const ty = trackStartY + idx * (trackH + trackGap);
+        const rowP = easeOutCubic(clamp((localT - 0.35 - idx * 0.35) / 1.35, 0, 1));
+        drawRoundedRect(rX + 20, ty, rW - 40, trackH, 12, 'rgba(255, 255, 255, 0.05)', 'rgba(255,255,255,0.10)', 1);
+
+        ctx.fillStyle = '#F8FAFC';
+        fit(tr.name, rX + 36, ty + 28, rW - 220, 14.5, '700', '"Prompt", sans-serif', 'left');
+
+        drawRoundedRect(rX + rW - 118, ty + 11, 82, 24, 12, tr.col + '26', tr.col, 1);
+        ctx.fillStyle = tr.col;
+        fit(tr.save, rX + rW - 77, ty + 27, 68, 12, '900', '"JetBrains Mono", monospace', 'center');
+
+        // Full Before Track vs Dynamic Compressed Auto Track
+        const tbX = rX + 36;
+        const tbW = rW - 310;
+        const tbY = ty + 48;
+        drawRoundedRect(tbX, tbY, tbW, 12, 6, 'rgba(239, 68, 68, 0.26)', 'rgba(248,113,113,0.4)', 0.8);
+        const curRatio = 1 - (1 - tr.ratio) * rowP;
+        drawRoundedRect(tbX, tbY, Math.max(12, tbW * curRatio), 12, 6, tr.col, null, 0);
+
+        // Racing photon inside bar
+        const rDotX = tbX + Math.max(8, tbW * curRatio) * ((nowSec * 1.1 + idx * 0.2) % 1);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(rDotX, tbY + 6, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#CBD5E1';
+        fit(`${tr.before} ➔ ${tr.after}`, rX + rW - 36, tbY + 11, 212, 12.5, '700', '"JetBrains Mono", monospace', 'right');
+      });
+
+    } else {
+      // === CLIP 3 (10..15s): 1.2M THB / YEAR COST REDUCTION ===
+      const curveP = easeOutCubic(clamp(localT / 3.0, 0, 1));
+      const cW = 678;
+      drawRoundedRect(stageX, stageY, cW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(52, 211, 153, 0.52)', 1.5);
+
+      ctx.fillStyle = '#FFFFFF';
+      fit('CUMULATIVE COST REDUCTION TRAJECTORY (12 MONTHS · 0 ➔ 1.2M THB)', stageX + 24, stageY + 34, cW - 190, 15.5, '800', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(stageX + cW - 160, stageY + 16, 138, 26, 13, 'rgba(16, 185, 129, 0.22)', '#34D399', 1);
+      ctx.fillStyle = '#6EE7B7';
+      fit('TARGET: 1.2M/YR', stageX + cW - 91, stageY + 33, 122, 11, '800', '"JetBrains Mono", monospace', 'center');
+
+      // Chart Plot Geometry
+      const px = stageX + 76;
+      const py = stageY + 84;
+      const pw = cW - 110;
+      const ph = stageH - 168;
+
+      const yLevels = ['1.2M', '0.9M', '0.6M', '0.3M', '0 THB'];
+      yLevels.forEach((lbl, i) => {
+        const gy = py + (ph / 4) * i;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, gy);
+        ctx.lineTo(px + pw, gy);
+        ctx.stroke();
+
+        ctx.fillStyle = '#94A3B8';
+        fit(lbl, px - 12, gy + 4, 58, 11.5, '700', '"JetBrains Mono", monospace', 'right');
+      });
+
+      const xLabels = ['START', 'Q1 (M1-M3)', 'Q2 (M4-M6)', 'Q3 (M7-M9)', 'Q4 (M10-M12)'];
+      xLabels.forEach((lbl, i) => {
+        const gx = px + (pw / 4) * i;
+        ctx.fillStyle = '#94A3B8';
+        fit(lbl, gx, py + ph + 24, 110, 11.5, '700', '"JetBrains Mono", monospace', 'center');
+      });
+
+      // Smooth Cumulative Curve Path
+      const steps = 40;
+      const drawSteps = Math.max(1, Math.round(steps * curveP));
+      const getPt = (u) => {
+        // Gentle acceleration S-like ROI curve reaching 1.0 at u=1
+        const val = Math.pow(u, 0.92) * 0.92 + Math.sin(u * Math.PI) * 0.08;
+        return {
+          x: px + pw * u,
+          y: py + ph * (1 - clamp(val, 0, 1))
+        };
+      };
+
+      // Area Gradient Fill underneath curve
+      const areaGrad = ctx.createLinearGradient(0, py, 0, py + ph);
+      areaGrad.addColorStop(0.0, 'rgba(52, 211, 153, 0.36)');
+      areaGrad.addColorStop(0.6, 'rgba(16, 185, 129, 0.14)');
+      areaGrad.addColorStop(1.0, 'rgba(16, 185, 129, 0.00)');
+
+      ctx.beginPath();
+      ctx.moveTo(px, py + ph);
+      for (let i = 0; i <= drawSteps; i++) {
+        const pt = getPt(i / steps);
+        ctx.lineTo(pt.x, pt.y);
+      }
+      const tipPt = getPt(drawSteps / steps);
+      ctx.lineTo(tipPt.x, py + ph);
+      ctx.closePath();
+      ctx.fillStyle = areaGrad;
+      ctx.fill();
+
+      // Curve Line Stroke
+      const lineGrad = ctx.createLinearGradient(px, py + ph, px + pw, py);
+      lineGrad.addColorStop(0, '#10B981');
+      lineGrad.addColorStop(0.65, '#34D399');
+      lineGrad.addColorStop(1, '#FBBF24');
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let i = 0; i <= drawSteps; i++) {
+        const pt = getPt(i / steps);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+
+      // Quarter Milestones along Curve
+      [0.25, 0.50, 0.75, 1.0].forEach((mU, mi) => {
+        if (curveP >= mU - 0.02) {
+          const mp = getPt(mU);
+          ctx.fillStyle = mi === 3 ? '#FBBF24' : '#34D399';
+          ctx.beginPath();
+          ctx.arc(mp.x, mp.y, mi === 3 ? 7 : 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FDE68A';
+          fit(['+0.3M', '+0.6M', '+0.9M', '1.2M ✓'][mi], mp.x - (mi === 3 ? 28 : 0), mp.y - 14, 70, 12, '800', '"JetBrains Mono", monospace', 'center');
+        }
+      });
+
+      // Live Tracking Marker Badge at tipPt
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#FBBF24';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(tipPt.x, tipPt.y, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      const callX = clamp(tipPt.x - 62, px + 8, px + pw - 134);
+      const callY = clamp(tipPt.y - 52, py + 6, py + ph - 40);
+      drawRoundedRect(callX, callY, 124, 30, 8, '#064E3B', '#FBBF24', 1.4);
+      ctx.fillStyle = '#FFFFFF';
+      fit(`${(1.2 * curveP).toFixed(2)}M THB`, callX + 62, callY + 20, 110, 13, '900', '"JetBrains Mono", monospace', 'center');
+
+      // Chart Footnote Strip
+      drawRoundedRect(stageX + 20, stageY + stageH - 54, cW - 40, 36, 10, 'rgba(6, 78, 59, 0.45)', '#10B98155', 1);
+      ctx.fillStyle = '#D1FAE5';
+      fit('✓ ลดต้นทุนแรงงานซ้ำซ้อน  ·  ตัดของเสียหน้างานจากผิดแบบ  ·  คืนทุนทันทีตั้งแต่งวดแรก', stageX + cW / 2, stageY + stageH - 31, cW - 64, 13.5, '600', '"Prompt", sans-serif', 'center');
+
+      // Right Column: Hero Total + 3 Breakdown Drivers
+      const bX = stageX + cW + 20;
+      const bW = stageW - cW - 20;
+      const heroGrad = ctx.createLinearGradient(bX, stageY, bX + bW, stageY + 132);
+      heroGrad.addColorStop(0, '#0F3D31');
+      heroGrad.addColorStop(1, '#1A5947');
+      drawRoundedRect(bX, stageY, bW, 132, 16, heroGrad, '#6EE7B7', 1.6);
+
+      ctx.fillStyle = '#A7F3D0';
+      fit('ANNUAL COST REDUCTION TOTAL', bX + 24, stageY + 30, bW - 48, 11.5, '800', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#FFFFFF';
+      fit(`${(1.2 * curveP).toFixed(1)}M`, bX + 24, stageY + 90, 174, 52, '900', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(bX + 206, stageY + 54, 152, 34, 10, 'rgba(251, 191, 36, 0.22)', '#FBBF24', 1.2);
+      ctx.fillStyle = '#FDE68A';
+      fit('THB / YEAR', bX + 282, stageY + 76, 136, 14, '900', '"JetBrains Mono", monospace', 'center');
+      ctx.fillStyle = '#D1FAE5';
+      fit('มูลค่าที่ประหยัดได้จริงต่อปีจาก Auto BOM', bX + 24, stageY + 118, bW - 48, 12.5, '500', '"Prompt", sans-serif', 'left');
+
+      const drivers = [
+        { code: '01', title: 'MAN-HOUR EFFICIENCY', val: 650, pct: 0.54, sub: 'ลดชั่วโมงเขียนแบบ & ถอด BOM ซ้ำซ้อน', col: '#10B981' },
+        { code: '02', title: 'REWORK & SCRAP ZEROING', val: 350, pct: 0.29, sub: 'ลดปัญหาสั่งเหล็กผิด / เจาะ EE คลาดเคลื่อน', col: '#F59E0B' },
+        { code: '03', title: 'STANDARDIZATION SPEED', val: 200, pct: 0.17, sub: 'ลดเวลารอตรวจ Cross-Check ก่อนผลิต', col: '#38BDF8' }
+      ];
+      const dStartY = stageY + 148;
+      const dGap = 12;
+      const dH = (stageH - 148 - dGap * 2) / 3;
+
+      drivers.forEach((dr, di) => {
+        const dy = dStartY + di * (dH + dGap);
+        const dp = easeOutCubic(clamp((localT - 0.5 - di * 0.45) / 1.5, 0, 1));
+        drawRoundedRect(bX, dy, bW, dH, 14, 'rgba(15, 23, 42, 0.62)', dr.col + '88', 1.3);
+
+        drawRoundedRect(bX + 16, dy + 14, 34, 24, 6, dr.col + '2E', dr.col, 1);
+        ctx.fillStyle = '#FFFFFF';
+        fit(dr.code, bX + 33, dy + 30, 26, 11.5, '900', '"JetBrains Mono", monospace', 'center');
+
+        ctx.fillStyle = '#F8FAFC';
+        fit(dr.title, bX + 58, dy + 31, bW - 196, 13, '800', '"Prompt", sans-serif', 'left');
+
+        ctx.fillStyle = dr.col;
+        fit(`+${Math.round(dr.val * dp)}K`, bX + bW - 18, dy + 32, 114, 18, '900', '"JetBrains Mono", monospace', 'right');
+
+        ctx.fillStyle = '#CBD5E1';
+        fit(dr.sub, bX + 18, dy + 60, bW - 36, 13, '500', '"Prompt", sans-serif', 'left');
+
+        const dbW = bW - 36;
+        const dbY = dy + dH - 22;
+        drawRoundedRect(bX + 18, dbY, dbW, 8, 4, 'rgba(255,255,255,0.12)', null, 0);
+        drawRoundedRect(bX + 18, dbY, Math.max(8, dbW * dr.pct * dp), 8, 4, dr.col, null, 0);
+      });
+    }
+
+    ctx.restore(); // restore stageAlpha
+
+    // Bottom 3 x 5s Segment Progress Strip
+    const footY = y + h - 38;
+    const segLabels = ['01 · 7 Days → 1 Day (5s)', '02 · 86% Cycle Time (5s)', '03 · 1.2M Cost Saving (5s)'];
+    const segW = 296;
+    const segGap = 14;
+    segLabels.forEach((lbl, si) => {
+      const sx = x + 22 + si * (segW + segGap);
+      const isCur = clipIdx === si;
+      const isDone = clipIdx > si;
+      const segFill = isDone ? 1 : (isCur ? clamp(localT / 5.0, 0, 1) : 0);
+
+      ctx.fillStyle = isCur ? '#FFFFFF' : (isDone ? '#6EE7B7' : '#94A3B8');
+      fit(lbl, sx, footY + 6, segW, 11.5, isCur ? '800' : '600', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(sx, footY + 13, segW, 7, 3.5, 'rgba(255,255,255,0.12)', null, 0);
+      if (segFill > 0) {
+        drawRoundedRect(sx, footY + 13, Math.max(6, segW * segFill), 7, 3.5, isCur ? meta.accent : '#10B981', null, 0);
+      }
+      app._v3ResultsHits.push({ x: sx, y: footY - 8, w: segW, h: 32, targetT: si * 5.0 + 0.05 });
+    });
+
+    // Destination Pill: 5 OUTPUTS (รูปที่ 2)
+    const destX = x + w - 224;
+    drawRoundedRect(destX, footY - 4, 202, 28, 14, clipT >= 13.5 ? '#10B981' : 'rgba(255,255,255,0.10)', '#10B981AA', 1.1);
+    ctx.fillStyle = clipT >= 13.5 ? '#052E24' : '#A7F3D0';
+    fit('NEXT ➔ 5 OUTPUTS (รูปที่ 2)', destX + 101, footY + 14, 186, 11.5, '800', '"Prompt", sans-serif', 'center');
+    app._v3ResultsHits.push({ x: destX, y: footY - 4, w: 202, h: 28, targetT: 15.05 });
+
+    ctx.restore();
+    ctx.restore();
+  }
+
   function drawSlide13ResultsScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
     const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+    const slideId = (s && s.id) || 'v3-results';
+    if (app._v3ResLastSlideId !== slideId) {
+      app._v3ResLastSlideId = slideId;
+      app._v3ResLastElapsed = app.slideElapsed || 0;
+    }
+    const curElapsed = app.slideElapsed || 0;
+    if (!app.isPlaying && app._v3ResLastElapsed !== undefined && Math.abs(curElapsed - app._v3ResLastElapsed) > 0.35) {
+      app._v3motionSeconds = curElapsed;
+    }
+    app._v3ResLastElapsed = curElapsed;
+
+    const rawMotion = app._v3motionSeconds || 0;
+    const t = app.v3MotionEnabled !== false
+      ? (app.isPlaying ? curElapsed : Math.max(rawMotion, curElapsed))
+      : (curElapsed > 0 ? curElapsed : 18);
+
+    app._v3ResultsHits = [];
+
+    if (app.canvas && !app.canvas._v3ResultsClickAttached) {
+      app.canvas._v3ResultsClickAttached = true;
+      app.canvas.addEventListener('click', (e) => {
+        const cur = app.slides && app.slides[app.activeSlideIndex];
+        if (!cur || cur.id !== 'v3-results' || !Array.isArray(app._v3ResultsHits)) return;
+        const rect = app.canvas.getBoundingClientRect();
+        if (!rect || !rect.width || !rect.height) return;
+        const cx = (e.clientX - rect.left) * (1920 / rect.width);
+        const cy = (e.clientY - rect.top) * (1080 / rect.height);
+        for (const hit of app._v3ResultsHits) {
+          if (cx >= hit.x && cx <= hit.x + hit.w && cy >= hit.y && cy <= hit.y + hit.h) {
+            const slideStart = typeof app.getSlideStartTime === 'function' ? app.getSlideStartTime(app.activeSlideIndex) : 0;
+            const targetT = hit.targetT;
+            const nSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+            app._v3motionSeconds = targetT;
+            app._v3lastMotion = nSec;
+            app._v3ResLastElapsed = targetT;
+            if (app.isPlaying && typeof app.seekTo === 'function') {
+              app.seekTo(slideStart + targetT);
+            } else {
+              app.slideElapsed = targetT;
+              if (typeof app.render === 'function') app.render();
+            }
+            return;
+          }
+        }
+      });
+    }
 
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     function easeOutCubic(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
@@ -6106,225 +7611,567 @@
       ctx.restore();
     }
 
-    // 1. Background: Charcoal-to-Mint Gradient matching Reference Image
-    const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
-    bgGrad.addColorStop(0.00, '#232a28');
-    bgGrad.addColorStop(0.30, '#435850');
-    bgGrad.addColorStop(0.65, '#78ad9a');
-    bgGrad.addColorStop(1.00, '#9ad5bf');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, 1920, 1080);
+    const fit = (txt, x, y, maxW, size, weight, family, align = 'left') => {
+      if (typeof app.fillFittedText === 'function') {
+        app.fillFittedText(ctx, txt, x, y, maxW, size, weight, family, align);
+      } else {
+        ctx.textAlign = align;
+        ctx.font = `${weight} ${size}px ${family}`;
+        ctx.fillText(txt, x, y);
+        ctx.textAlign = 'left';
+      }
+    };
 
-    // Subtle Architectural Grid Mesh
+    const drawWrappedThai = (value, x, y, maxW, size, lineH, color, weight = '400') => {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = `${weight} ${size}px "Prompt", "Segoe UI", sans-serif`;
+      const rawTokens = (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function')
+        ? Array.from(new Intl.Segmenter('th', { granularity: 'word' }).segment(value || ''), seg => seg.segment)
+        : Array.from(value || '');
+      // Keep opening/closing punctuation, numbers, and '%' attached so e.g. "(~86%)" never splits mid-token
+      const tokens = [];
+      for (const rt of rawTokens) {
+        if (tokens.length && (/^[%)\]}.,:;!?]+$/.test(rt) || /^[(\[{[~]+$/.test(tokens[tokens.length - 1]))) {
+          tokens[tokens.length - 1] += rt;
+        } else {
+          tokens.push(rt);
+        }
+      }
+      const lines = [];
+      let line = '';
+      for (const tok of tokens) {
+        if (line && ctx.measureText(line + tok).width > maxW) {
+          lines.push(line.trimEnd());
+          line = tok.trimStart();
+        } else {
+          line += tok;
+        }
+      }
+      if (line) lines.push(line.trimEnd());
+      lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineH));
+      ctx.restore();
+      return y + lines.length * lineH;
+    };
+
+    // 1. Background (Supports Studio BG Picker + Default Clean SCG HEIM Two-Surface Layout)
+    const pal = (typeof app.getCustomBackgroundPalette === 'function' && app.bgPreset && app.bgPreset !== 'default')
+      ? app.getCustomBackgroundPalette('mint')
+      : null;
+
+    const hdrH = 132;
+    if (pal && pal.stops) {
+      const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
+      pal.stops.forEach((col, i) => bgGrad.addColorStop(i / Math.max(1, pal.stops.length - 1), col));
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      const topBand = ctx.createLinearGradient(0, 0, 1920, 0);
+      if (pal.isDark) {
+        topBand.addColorStop(0, 'rgba(7, 15, 26, 0.56)');
+        topBand.addColorStop(1, 'rgba(11, 24, 38, 0.48)');
+      } else {
+        topBand.addColorStop(0, 'rgba(14, 38, 31, 0.96)');
+        topBand.addColorStop(1, 'rgba(22, 58, 47, 0.94)');
+      }
+      ctx.fillStyle = topBand;
+      ctx.fillRect(0, 0, 1920, hdrH);
+    } else {
+      const lowGrad = ctx.createLinearGradient(0, hdrH, 1920, 1080);
+      lowGrad.addColorStop(0.00, '#EEF5F2');
+      lowGrad.addColorStop(0.55, '#E5F0EB');
+      lowGrad.addColorStop(1.00, '#DCEAE4');
+      ctx.fillStyle = lowGrad;
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      const topGrad = ctx.createLinearGradient(0, 0, 1920, 0);
+      topGrad.addColorStop(0.00, '#0E261F');
+      topGrad.addColorStop(0.60, '#163A2F');
+      topGrad.addColorStop(1.00, '#182C26');
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(0, 0, 1920, hdrH);
+    }
+
+    // Subtle Architectural CAD Grid Mesh
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let gx = 0; gx < 1920; gx += 40) { ctx.moveTo(gx, 0); ctx.lineTo(gx, 1080); }
-    for (let gy = 0; gy < 1080; gy += 40) { ctx.moveTo(0, gy); ctx.lineTo(1920, gy); }
+    for (let gx = 0; gx < 1920; gx += 48) { ctx.moveTo(gx, 0); ctx.lineTo(gx, hdrH); }
+    for (let gy = 0; gy < hdrH; gy += 48) { ctx.moveTo(0, gy); ctx.lineTo(1920, gy); }
+    ctx.stroke();
+
+    ctx.strokeStyle = (pal && pal.isDark) ? 'rgba(255, 255, 255, 0.04)' : 'rgba(16, 62, 48, 0.045)';
+    ctx.beginPath();
+    for (let gx = 0; gx < 1920; gx += 48) { ctx.moveTo(gx, hdrH); ctx.lineTo(gx, 1080); }
+    for (let gy = hdrH; gy < 1080; gy += 48) { ctx.moveTo(0, gy); ctx.lineTo(1920, gy); }
     ctx.stroke();
     ctx.restore();
+
+    // Crisp Emerald Accent Divider below Header
+    const hLine = ctx.createLinearGradient(0, hdrH, 1920, hdrH);
+    hLine.addColorStop(0, '#F59E0B');
+    hLine.addColorStop(0.4, '#10B981');
+    hLine.addColorStop(1, '#2563EB');
+    ctx.fillStyle = hLine;
+    ctx.fillRect(0, hdrH - 4, 1920, 4);
 
     // Top-Right Page Counter Badge
     drawPageBadge(ctx, app);
 
     // 2. Top Header Banner
+    const marginX = 56;
     const titleP = easeOutCubic(t / 0.45);
     ctx.save();
     ctx.globalAlpha = titleP;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '800 48px "Prompt", sans-serif';
-    ctx.fillText('RESULT | Auto BOM System Development', 45, 75);
+    ctx.fillStyle = '#FFFFFF';
+    fit('RESULT  |  Auto BOM System Development', marginX, 68, 1380, 42, '800', '"Prompt", sans-serif', 'left');
 
-    ctx.fillStyle = '#d2f2e5';
-    ctx.font = '500 20px "Prompt", sans-serif';
-    ctx.fillText(':: End-to-End Value Creation from Design to Production & Installation', 45, 112);
+    ctx.fillStyle = '#A7F3D0';
+    fit(':: End-to-End Value Creation from Design to Production & Installation', marginX, 104, 1380, 19, '500', '"Prompt", sans-serif', 'left');
     ctx.restore();
 
-    // 3. Left Column: 4 Value Pillars (x = 45..580)
-    const pilP = easeOutCubic((t - 0.15) / 0.5);
-    ctx.save();
-    ctx.globalAlpha = pilP;
+    // 3. Left Column: 4 Clean Executive Value Pillar Cards (x = 56..644, y = 164..1008)
+    const pilP = easeOutCubic((t - 0.12) / 0.5);
+    const leftX = marginX;
+    const leftW = 588;
+    const pilStartY = 164;
+    const pilH = 196;
+    const pilGap = 20;
 
     const pillars = [
       {
-        num: '01 | TIME REDUCTION',
-        sub: '7 Days Before 1 Day After',
-        desc: 'ลดระยะเวลาจัดทำ BOM และ Drawing ประมาณ 86%'
+        code: '01',
+        title: 'TIME REDUCTION',
+        badge: '7 Days ➔ 1 Day (-86%)',
+        accent: '#D97706',
+        soft: '#FFFBEB',
+        desc: 'ลดระยะเวลาจัดทำ BOM และ Shop Drawing จาก 7 วัน เหลือเพียง 1 วัน (~86%) ด้วยระบบคำนวณและขึ้นโมเดลอัตโนมัติ'
       },
       {
-        num: '02 | SKILL & KNOWLEDGE STANDARDIZATION',
-        sub: '',
-        desc: 'เปลี่ยนองค์ความรู้เฉพาะบุคคลเป็น Logic และมาตรฐานในระบบ ลดการพึ่งพาทักษะการจัดทำ BOM ด้วยมือ'
+        code: '02',
+        title: 'SKILL & KNOWLEDGE STANDARDIZATION',
+        badge: 'Logic Standard',
+        accent: '#059669',
+        soft: '#ECFDF5',
+        desc: 'เปลี่ยนองค์ความรู้เฉพาะบุคคลเป็น Logic และมาตรฐานในระบบ ลดการพึ่งพาทักษะและประสบการณ์รายบุคคลในการจัดทำ BOM ด้วยมือ'
       },
       {
-        num: '03 | ERROR & LOSS REDUCTION',
-        sub: '',
-        desc: 'ลดขั้นตอนการทำงานด้วยมือ และเพิ่มความสม่ำเสมอของข้อมูลผ่านกระบวนการ Automation โดยควรมีข้อมูลข้อผิดพลาดก่อน-หลังเพื่อยืนยันผล'
+        code: '03',
+        title: 'ERROR & LOSS REDUCTION',
+        badge: 'Zero Rework',
+        accent: '#2563EB',
+        soft: '#EFF6FF',
+        desc: 'ลดขั้นตอนการทำงานซ้ำซ้อนด้วยมือ เพิ่มความแม่นยำและสม่ำเสมอของข้อมูลผ่าน Automation ลดโอกาสผิดพลาดก่อนส่งผลิตจริง'
       },
       {
-        num: '04 | AUTOMATED OUTPUT & DATA INTEGRATION',
-        sub: '',
-        desc: 'เชื่อมการสร้าง 3D Visualization, 2D Assembly Drawing, Cad Punching Board, Job Order และ Part Item ให้เป็นกระบวนการเดียวกัน พร้อมนำข้อมูลไปใช้ในขั้นตอนถัดไป'
+        code: '04',
+        title: 'AUTOMATED OUTPUT & DATA INTEGRATION',
+        badge: 'Single Model Sync',
+        accent: '#4F46E5',
+        soft: '#EEF2FF',
+        desc: 'เชื่อมการสร้าง 3D, 2D Assembly Drawing, CAD Punching, Job Order และ Part Items ให้เป็นกระบวนการเดียว พร้อมส่งต่อโรงงานผลิต'
       }
     ];
 
-    let yPil = 175;
-    pillars.forEach((p) => {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '800 24px "Prompt", sans-serif';
-      ctx.fillText(p.num, 45, yPil);
-      let curY = yPil + 30;
+    pillars.forEach((p, idx) => {
+      const pAnim = easeOutCubic((t - 0.10 - idx * 0.08) / 0.45);
+      const py = pilStartY + idx * (pilH + pilGap) + (1 - pAnim) * 16;
+      ctx.save();
+      ctx.globalAlpha = pilP * pAnim;
 
-      if (p.sub) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 20px "Prompt", sans-serif';
-        ctx.fillText(p.sub, 45, curY);
-        curY += 28;
-      }
+      // Soft Shadow + Clean White Card
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 6;
+      drawRoundedRect(leftX, py, leftW, pilH, 16, '#FFFFFF', '#CBD5E1', 1.2);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
 
-      ctx.fillStyle = '#e4f5ed';
-      app.fillFittedText(ctx, p.desc, 45, curY, 530, 17, '400', '"Prompt", sans-serif', 'left', 24);
+      // Left Color Spine Accent Bar
+      ctx.fillStyle = p.accent;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(leftX, py + 18, 5, pilH - 36, [0, 4, 4, 0]);
+      else ctx.rect(leftX, py + 18, 5, pilH - 36);
+      ctx.fill();
 
-      yPil += 140;
+      // Index Badge
+      drawRoundedRect(leftX + 24, py + 22, 42, 28, 8, p.soft, p.accent, 1.1);
+      ctx.fillStyle = p.accent;
+      fit(p.code, leftX + 45, py + 41, 34, 13.5, '900', '"Prompt", sans-serif', 'center');
+
+      // Right Meta Pill
+      const bW = p.badge.length > 16 ? 174 : 130;
+      drawRoundedRect(leftX + leftW - 22 - bW, py + 23, bW, 26, 13, p.soft, p.accent + '55', 1);
+      ctx.fillStyle = p.accent;
+      fit(p.badge, leftX + leftW - 22 - bW / 2, py + 40, bW - 14, 12, '800', '"Prompt", sans-serif', 'center');
+
+      // Pillar Title (cleanly positioned below badge strip or beside badge with safe width)
+      ctx.fillStyle = '#0F172A';
+      fit(p.title, leftX + 24, py + 80, leftW - 48, 19.5, '800', '"Prompt", sans-serif', 'left');
+
+      // Subtle Hairline Divider
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillRect(leftX + 24, py + 94, leftW - 48, 1.2);
+
+      // Clean Multi-Line Wrapped Thai Description (ZERO squishing!)
+      drawWrappedThai(p.desc, leftX + 24, py + 120, leftW - 48, 16, 25, '#334155', '400');
+
+      ctx.restore();
     });
-    ctx.restore();
 
-    // 4. Top Right: 3 KPI Cards (x = 640..1870, y = 140..310)
-    const kpiP = easeOutCubic((t - 0.25) / 0.5);
+    // 4. Right Main Zone (x = 680..1864, width = 1184)
+    const rightX = 680;
+    const rightGap = 22;
+    const colW = (1184 - rightGap * 2) / 3; // 380px exact
+    const kpiY = 164;
+    const kpiH = 178;
+
+    const kpiP = easeOutCubic((t - 0.22) / 0.5);
+    const inClipSequence = t < 15.0;
+    const clipPhaseIdx = t < 5.0 ? 0 : (t < 10.0 ? 1 : 2);
+    const activeKpi = inClipSequence ? clipPhaseIdx : Math.floor((nowSec / 2.6) % 3);
+    const pulseWave = (nowSec * 0.72) % 1;
     ctx.save();
     ctx.globalAlpha = kpiP;
 
-    // KPI 1: ลดระยะเวลา BOM & Drawing [ 7 Days > 1 Day ]
-    const k1X = 640;
-    const k1Y = 160;
-    ctx.fillStyle = '#1c2823';
-    ctx.font = '600 21px "Prompt", sans-serif';
-    ctx.fillText('ลดระยะเวลา BOM & Drawing', k1X, k1Y);
-    ctx.fillStyle = '#0f1714';
-    ctx.font = '800 36px "Prompt", sans-serif';
-    ctx.fillText('[ 7 Days > 1 Day ]', k1X, k1Y + 42);
-    // Underline bar
-    ctx.fillStyle = '#0f1714';
-    ctx.fillRect(k1X, k1Y + 54, 280, 5);
+    const drawKpiPlayTag = (cardX, liftY, idx, badgeRightEdge, isDarkCard, activeColor) => {
+      const slotX = Math.max(cardX + badgeRightEdge + 10, cardX + colW - 134);
+      const slotW = cardX + colW - 18 - slotX;
+      if (slotW < 68) return;
+      const isPlayingThis = inClipSequence && clipPhaseIdx === idx;
+      if (isPlayingThis) {
+        const rem = Math.max(0, (idx + 1) * 5.0 - t).toFixed(1);
+        drawRoundedRect(slotX, kpiY + liftY + 18, slotW, 26, 13, '#10B981', '#6EE7B7', 1.1);
+        ctx.fillStyle = '#052E24';
+        fit(`▶ CLIP · ${rem}s`, slotX + slotW / 2, kpiY + liftY + 35, slotW - 10, 11, '900', '"JetBrains Mono", monospace', 'center');
+      } else {
+        drawRoundedRect(slotX, kpiY + liftY + 18, slotW, 26, 13, isDarkCard ? 'rgba(255,255,255,0.08)' : '#F1F5F9', isDarkCard ? 'rgba(255,255,255,0.2)' : '#CBD5E1', 1);
+        ctx.fillStyle = isDarkCard ? '#A7F3D0' : '#64748B';
+        fit(`▶ Clip 0${idx + 1}`, slotX + slotW / 2, kpiY + liftY + 35, slotW - 10, 11, '700', '"Prompt", sans-serif', 'center');
+      }
+    };
 
-    // KPI 2: Downward Trend Line + 86%
-    const k2X = 990;
-    const k2Y = 140;
-    ctx.strokeStyle = '#0f1714';
-    ctx.lineWidth = 5.5;
+    // KPI Card 1: Lead Time Reduction (7 Days -> 1 Day · Running Compression)
+    const k1X = rightX;
+    const k1Lift = activeKpi === 0 ? -3 : 0;
+    ctx.shadowColor = activeKpi === 0 ? 'rgba(5, 150, 105, 0.22)' : 'rgba(15, 23, 42, 0.08)';
+    ctx.shadowBlur = activeKpi === 0 ? 22 : 16;
+    ctx.shadowOffsetY = activeKpi === 0 ? 8 : 6;
+    drawRoundedRect(k1X, kpiY + k1Lift, colW, kpiH, 16, '#FFFFFF', activeKpi === 0 ? '#10B981' : '#CBD5E1', activeKpi === 0 ? 2.0 : 1.2);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    drawRoundedRect(k1X + 24, kpiY + k1Lift + 18, 178, 26, 13, '#ECFDF5', '#05966955', 1);
+    ctx.fillStyle = '#047857';
+    fit('LEAD TIME REDUCTION', k1X + 113, kpiY + k1Lift + 35, 160, 11.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k1X, k1Lift, 0, 202, false, '#10B981');
+    app._v3ResultsHits.push({ x: k1X, y: kpiY, w: colW, h: kpiH, targetT: 0.05 });
+
+    // Rolling countdown 7 -> 1 on slide entrance
+    const dayRollP = easeOutCubic((t - 0.25) / 1.25);
+    const curDayVal = Math.max(1, Math.round(7 - 6 * dayRollP));
+    const strikeP = easeOutCubic((t - 0.35) / 0.75);
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '700 26px "Prompt", sans-serif';
+    ctx.fillText('7 Days', k1X + 24, kpiY + k1Lift + 106);
+    const w7 = ctx.measureText('7 Days').width;
+    ctx.fillStyle = '#EF4444';
+    ctx.fillRect(k1X + 22, kpiY + k1Lift + 96, (w7 + 4) * strikeP, 2.5);
+
+    // Animated sequential triple chevrons ▸ ▸ ▸
+    const chevBaseX = k1X + 34 + w7;
+    for (let ci = 0; ci < 3; ci++) {
+      const chA = 0.28 + 0.72 * Math.max(0, Math.sin((nowSec * 5.2) - ci * 1.1));
+      ctx.fillStyle = `rgba(5, 150, 105, ${chA.toFixed(2)})`;
+      ctx.font = '900 18px "Prompt", sans-serif';
+      ctx.fillText('▸', chevBaseX + ci * 12, kpiY + k1Lift + 104);
+    }
+
+    ctx.fillStyle = '#059669';
+    ctx.font = '900 44px "Prompt", sans-serif';
+    ctx.fillText(`${curDayVal} Day`, chevBaseX + 44, kpiY + k1Lift + 110);
+
+    // Continuous time-compression track (7d -> 1d racing pulse)
+    const barW1 = colW - 48;
+    const barY1 = kpiY + k1Lift + 132;
+    drawRoundedRect(k1X + 24, barY1, barW1, 8, 4, '#E2E8F0', null, 0);
+    const fill1W = barW1 * (1 - 0.86 * dayRollP);
+    drawRoundedRect(k1X + 24, barY1, Math.max(24, fill1W), 8, 4, '#059669', null, 0);
+    const run1X = k1X + 24 + barW1 * (1 - pulseWave * 0.86);
+    ctx.save();
+    ctx.fillStyle = '#34D399';
+    ctx.shadowColor = '#10B981';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.moveTo(k2X, k2Y + 50);
-    ctx.lineTo(k2X + 42, k2Y + 80);
-    ctx.lineTo(k2X + 85, k2Y + 80);
-    ctx.lineTo(k2X + 85, k2Y + 115);
-    ctx.stroke();
-    // Arrow head
-    ctx.fillStyle = '#0f1714';
-    ctx.beginPath();
-    ctx.moveTo(k2X + 72, k2Y + 110);
-    ctx.lineTo(k2X + 98, k2Y + 110);
-    ctx.lineTo(k2X + 85, k2Y + 132);
-    ctx.closePath();
+    ctx.arc(run1X, barY1 + 4, 4.5, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.fillStyle = '#0f1714';
-    ctx.font = '900 115px "Prompt", sans-serif';
-    ctx.fillText('86%', k2X + 115, k2Y + 95);
-
-    // KPI 3: Purple / Lilac rounded card: Cost Reduction -1,200,000 THB/YEAR
-    const k3X = 1450;
-    const k3Y = 135;
-    const k3W = 420;
-    const k3H = 162;
-    drawRoundedRect(k3X, k3Y, k3W, k3H, 24, '#b4a2c8', '#9e8db3', 1.5);
-    // Inner badge
-    drawRoundedRect(k3X + 45, k3Y + 16, 230, 36, 18, '#d5c9e4', null, 0);
-    ctx.fillStyle = '#392e47';
-    ctx.font = '700 18px "Prompt", sans-serif';
-    ctx.fillText('Cost Reduction', k3X + 92, k3Y + 41);
-
-    ctx.fillStyle = '#221830';
-    ctx.font = '900 58px "Prompt", sans-serif';
-    ctx.fillText('-1,200,000', k3X + 30, k3Y + 104);
-
-    ctx.fillStyle = '#4a3d5c';
-    ctx.font = '700 17px "Prompt", sans-serif';
-    ctx.fillText('THB / YEAR', k3X + 245, k3Y + 132);
     ctx.restore();
 
-    // 5. Bottom Right: 5 Document Output Thumbnails (x = 640..1870, y = 360..1040)
-    const docP = easeOutCubic((t - 0.35) / 0.55);
+    ctx.fillStyle = '#475569';
+    fit('ลดระยะเวลาจัดทำ BOM & Drawing', k1X + 24, kpiY + k1Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+
+    // KPI Card 2: Cycle Time Saved (0% -> 86% · Live Photon Runner + Floating Arrow)
+    const k2X = rightX + colW + rightGap;
+    const k2Lift = activeKpi === 1 ? -3 : 0;
+    ctx.shadowColor = activeKpi === 1 ? 'rgba(217, 119, 6, 0.20)' : 'rgba(15, 23, 42, 0.08)';
+    ctx.shadowBlur = activeKpi === 1 ? 22 : 16;
+    ctx.shadowOffsetY = activeKpi === 1 ? 8 : 6;
+    drawRoundedRect(k2X, kpiY + k2Lift, colW, kpiH, 16, '#FFFFFF', activeKpi === 1 ? '#F59E0B' : '#CBD5E1', activeKpi === 1 ? 2.0 : 1.2);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    drawRoundedRect(k2X + 24, kpiY + k2Lift + 18, 168, 26, 13, '#FFFBEB', '#D9770655', 1);
+    ctx.fillStyle = '#B45309';
+    fit('CYCLE TIME SAVED', k2X + 108, kpiY + k2Lift + 35, 150, 11.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k2X, k2Lift, 1, 192, false, '#F59E0B');
+    app._v3ResultsHits.push({ x: k2X, y: kpiY, w: colW, h: kpiH, targetT: 5.05 });
+
+    const pctRollP = easeOutCubic((t - 0.30) / 1.35);
+    const pctVal = Math.round(86 * pctRollP);
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '900 54px "Prompt", sans-serif';
+    ctx.fillText(`${pctVal}%`, k2X + 24, kpiY + k2Lift + 112);
+
+    // Live bobbing Faster Output pill beside 86%
+    const bobY = Math.sin(nowSec * 5.0) * 2.2;
+    drawRoundedRect(k2X + 188, kpiY + k2Lift + 72, 166, 36, 10, '#ECFDF5', '#10B98166', 1.1);
+    ctx.fillStyle = '#059669';
+    fit('▼ Faster Output', k2X + 271, kpiY + k2Lift + 95 + bobY * 0.4, 148, 13.5, '800', '"Prompt", sans-serif', 'center');
+
+    // Efficiency Progress Bar (0 -> 86%) + racing photon runner
+    const barY2 = kpiY + k2Lift + 132;
+    const target86W = barW1 * 0.86 * pctRollP;
+    drawRoundedRect(k2X + 24, barY2, barW1, 8, 4, '#E2E8F0', null, 0);
+    const p2Grad = ctx.createLinearGradient(k2X + 24, 0, k2X + 24 + barW1 * 0.86, 0);
+    p2Grad.addColorStop(0, '#059669');
+    p2Grad.addColorStop(1, '#34D399');
+    drawRoundedRect(k2X + 24, barY2, Math.max(8, target86W), 8, 4, p2Grad, null, 0);
+
+    const run2X = k2X + 24 + target86W * ((nowSec * 0.85) % 1);
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = '#10B981';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(run2X, barY2 + 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#475569';
+    fit('ประหยัดเวลากระบวนการออกแบบรวม', k2X + 24, kpiY + k2Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+
+    // KPI Card 3: Annual Cost Reduction (0.0M -> 1.2M · Evergreen Sheen & ROI Photon)
+    const k3X = rightX + (colW + rightGap) * 2;
+    const k3Lift = activeKpi === 2 ? -3 : 0;
+    ctx.shadowColor = activeKpi === 2 ? 'rgba(52, 211, 153, 0.28)' : 'rgba(15, 23, 42, 0.14)';
+    ctx.shadowBlur = activeKpi === 2 ? 24 : 18;
+    ctx.shadowOffsetY = activeKpi === 2 ? 9 : 8;
+    const costGrad = ctx.createLinearGradient(k3X, kpiY + k3Lift, k3X + colW, kpiY + k3Lift + kpiH);
+    costGrad.addColorStop(0, '#0F2E25');
+    costGrad.addColorStop(1, '#1A4B3D');
+    drawRoundedRect(k3X, kpiY + k3Lift, colW, kpiH, 16, costGrad, activeKpi === 2 ? '#6EE7B7' : '#34D39966', activeKpi === 2 ? 2.0 : 1.4);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Subtle diagonal sheen sweep inside Cost Reduction card
+    ctx.save();
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(k3X, kpiY + k3Lift, colW, kpiH, 16);
+    else ctx.rect(k3X, kpiY + k3Lift, colW, kpiH);
+    ctx.clip();
+    const sheenProg = (nowSec * 0.42) % 1;
+    const sheenX = k3X - 140 + (colW + 280) * sheenProg;
+    const sGrad = ctx.createLinearGradient(sheenX, kpiY, sheenX + 110, kpiY + kpiH);
+    sGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    sGrad.addColorStop(0.5, 'rgba(110, 231, 183, 0.11)');
+    sGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = sGrad;
+    ctx.fillRect(k3X, kpiY + k3Lift, colW, kpiH);
+    ctx.restore();
+
+    drawRoundedRect(k3X + 24, kpiY + k3Lift + 18, 206, 26, 13, 'rgba(52, 211, 153, 0.18)', 'rgba(52, 211, 153, 0.48)', 1);
+    ctx.fillStyle = '#6EE7B7';
+    fit('ANNUAL COST REDUCTION', k3X + 127, kpiY + k3Lift + 35, 188, 11.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k3X, k3Lift, 2, 230, true, '#34D399');
+    app._v3ResultsHits.push({ x: k3X, y: kpiY, w: colW, h: kpiH, targetT: 10.05 });
+
+    // Rolling counter 0.0M -> 1.2M
+    const costRollP = easeOutCubic((t - 0.35) / 1.40);
+    const costValStr = `${(1.2 * costRollP).toFixed(1)}M`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 54px "Prompt", sans-serif';
+    ctx.fillText(costValStr, k3X + 24, kpiY + k3Lift + 112);
+
+    // Inline THB / YEAR pill matching Card 2 layout rhythm
+    const costBob = Math.sin(nowSec * 4.5 + 1.2) * 2.0;
+    drawRoundedRect(k3X + 190, kpiY + k3Lift + 72, 164, 36, 10, 'rgba(16, 185, 129, 0.22)', 'rgba(110, 231, 183, 0.50)', 1.1);
+    ctx.fillStyle = '#A7F3D0';
+    fit('THB / YEAR', k3X + 272, kpiY + k3Lift + 95 + costBob * 0.35, 144, 13.5, '800', '"JetBrains Mono", monospace', 'center');
+
+    // Continuous ROI energy track with glowing gold-mint photon
+    const barY3 = kpiY + k3Lift + 132;
+    drawRoundedRect(k3X + 24, barY3, barW1, 8, 4, 'rgba(255, 255, 255, 0.14)', null, 0);
+    const roiGrad = ctx.createLinearGradient(k3X + 24, 0, k3X + 24 + barW1, 0);
+    roiGrad.addColorStop(0, '#10B981');
+    roiGrad.addColorStop(1, '#FBBF24');
+    drawRoundedRect(k3X + 24, barY3, Math.max(10, barW1 * costRollP), 8, 4, roiGrad, null, 0);
+
+    const run3X = k3X + 24 + barW1 * costRollP * ((nowSec * 0.95) % 1);
+    ctx.save();
+    ctx.fillStyle = '#FDE68A';
+    ctx.shadowColor = '#FBBF24';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(run3X, barY3 + 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+    fit('ลดต้นทุนแรงงานและการแก้ไขแบบต่อปี', k3X + 24, kpiY + k3Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+    ctx.restore();
+
+    // 5. Right Lower Section: Synchronized 3x5s Animated Clips (0..15s) -> Pinned 5 Deliverable Gallery (>= 15s)
+    if (inClipSequence) {
+      // Connector beam linking the active KPI Card (7->1d / 86% / 1.2M) into the large clip viewport
+      const connCols = ['#10B981', '#F59E0B', '#34D399'];
+      const connCol = connCols[clipPhaseIdx];
+      const connX = rightX + clipPhaseIdx * (colW + rightGap) + colW / 2;
+      ctx.save();
+      ctx.globalAlpha = kpiP;
+      ctx.strokeStyle = connCol;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(connX, kpiY + kpiH - 3);
+      ctx.lineTo(connX, 356);
+      ctx.stroke();
+      ctx.fillStyle = connCol;
+      ctx.beginPath();
+      ctx.moveTo(connX - 8, 354);
+      ctx.lineTo(connX + 8, 354);
+      ctx.lineTo(connX, 364);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      const clipIntroP = easeOutCubic((t - 0.18) / 0.45);
+      ctx.save();
+      ctx.globalAlpha = clipIntroP;
+      drawSlide13ResultClips(ctx, app, rightX, 364, 1184, 644, t, nowSec, pal, { clamp, easeOutCubic, drawRoundedRect, fit });
+      ctx.restore();
+      return;
+    }
+
+    const docP = easeOutCubic((t - 15.0) / 0.45);
     ctx.save();
     ctx.globalAlpha = docP;
 
-    const thW = 385;
-    const thGap = 28;
-    const thXs = [640, 640 + thW + thGap, 640 + (thW + thGap) * 2];
-    const thY1 = 365;
-    const thH1 = 230;
+    const hdrTxtCol = (pal && pal.isDark) ? '#E2E8F0' : '#0F2922';
+    ctx.fillStyle = hdrTxtCol;
+    fit('AUTOMATED OUTPUT DELIVERABLES — 5 ผลผลิตอัตโนมัติจาก Single Model', rightX, 382, 780, 15.5, '800', '"Prompt", sans-serif', 'left');
 
-    function drawDocCard(x, y, w, h, imgSrc, labelText, pillW) {
-      drawRoundedRect(x, y, w, h, 8, '#ffffff', 'rgba(0, 0, 0, 0.15)', 1);
-      const im = loadImage(imgSrc);
-      if (im && im.complete && im.naturalWidth) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x + 2, y + 2, w - 4, h - 4);
-        ctx.clip();
-        app.drawMediaContain(ctx, im, im.naturalWidth, im.naturalHeight, x + 2, y + 2, w - 4, h - 4);
-        ctx.restore();
+    // Clickable Replay 15s Clips button beside 100% MODEL SYNC badge
+    drawRoundedRect(rightX + 804, 362, 168, 26, 13, (pal && pal.isDark) ? 'rgba(56, 189, 248, 0.16)' : '#E0F2FE', '#0284C766', 1);
+    ctx.fillStyle = (pal && pal.isDark) ? '#7DD3FC' : '#0369A1';
+    fit('↻ เล่นคลิป 15s ซ้ำ', rightX + 888, 379, 152, 11.5, '800', '"Prompt", sans-serif', 'center');
+    app._v3ResultsHits.push({ x: rightX + 804, y: 358, w: 168, h: 34, targetT: 0.05 });
+
+    drawRoundedRect(rightX + 984, 362, 200, 26, 13, (pal && pal.isDark) ? 'rgba(16, 185, 129, 0.18)' : '#D1FAE5', '#05966955', 1);
+    ctx.fillStyle = (pal && pal.isDark) ? '#6EE7B7' : '#065F46';
+    fit('✓ 100% MODEL SYNC', rightX + 1084, 379, 180, 11.5, '800', '"Prompt", sans-serif', 'center');
+
+    function drawCleanOutputCard(x, y, w, h, code, labelText, subTag, imgList, accent) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 5;
+      drawRoundedRect(x, y, w, h, 14, '#FFFFFF', '#CBD5E1', 1.2);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      const footerH = 48;
+      const imgBoxH = h - footerH - 12;
+
+      // Clean white preview canvas
+      if (imgList.length === 1) {
+        const im = loadImage(imgList[0]);
+        if (im && im.complete && im.naturalWidth > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x + 10, y + 8, w - 20, imgBoxH);
+          ctx.clip();
+          app.drawMediaContain(ctx, im, im.naturalWidth, im.naturalHeight, x + 10, y + 8, w - 20, imgBoxH);
+          ctx.restore();
+        }
+      } else if (imgList.length === 2) {
+        const halfW = (w - 28) / 2;
+        imgList.forEach((src, i) => {
+          const im = loadImage(src);
+          const ix = x + 10 + i * (halfW + 8);
+          if (im && im.complete && im.naturalWidth > 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(ix, y + 8, halfW, imgBoxH);
+            ctx.clip();
+            app.drawMediaContain(ctx, im, im.naturalWidth, im.naturalHeight, ix, y + 8, halfW, imgBoxH);
+            ctx.restore();
+          }
+        });
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillRect(x + w / 2 - 0.5, y + 14, 1, imgBoxH - 12);
       }
-      const pw = pillW || 240;
-      const px = x + (w - pw) / 2;
-      const py = y + h + 12;
-      drawRoundedRect(px, py, pw, 36, 18, '#8bd3be', '#f48c56', 2);
-      ctx.fillStyle = '#14251e';
-      ctx.font = '800 16px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(labelText, px + pw / 2, py + 24);
-      ctx.textAlign = 'left';
-    }
 
-    // Row 1:
-    drawDocCard(thXs[0], thY1, thW, thH1, 'assets/design_stages/boq_3d_walls.png', '3D Visualization', 240);
-    drawDocCard(thXs[1], thY1, thW, thH1, 'assets/design_stages/doc_part_items.png', 'Part Items', 220);
-    drawDocCard(thXs[2], thY1, thW, thH1, 'assets/design_stages/doc_job_order.png', 'Job Order', 220);
-
-    // Row 2:
-    const thY2 = 685;
-    const thH2 = 270;
-    const wDwgTotal = thW * 2 + thGap;
-    drawRoundedRect(thXs[0], thY2, wDwgTotal, thH2, 8, '#ffffff', 'rgba(0, 0, 0, 0.15)', 1);
-    const im4a = loadImage('assets/ver3/slide_06_cad_wall_layout.png');
-    const im4b = loadImage('assets/ver3/slide_06_cad_detail_dwg.png');
-    const halfW = (wDwgTotal - 8) / 2;
-    if (im4a && im4a.complete && im4a.naturalWidth) {
+      // Clean integrated Card Footer Bar
+      const fy = y + h - footerH;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(thXs[0] + 4, thY2 + 4, halfW, thH2 - 8);
-      ctx.clip();
-      app.drawMediaContain(ctx, im4a, im4a.naturalWidth, im4a.naturalHeight, thXs[0] + 4, thY2 + 4, halfW, thH2 - 8);
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(x, fy, w, footerH, [0, 0, 14, 14]);
+      else ctx.rect(x, fy, w, footerH);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fill();
       ctx.restore();
-    }
-    if (im4b && im4b.complete && im4b.naturalWidth) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(thXs[0] + 4 + halfW, thY2 + 4, halfW, thH2 - 8);
-      ctx.clip();
-      app.drawMediaContain(ctx, im4b, im4b.naturalWidth, im4b.naturalHeight, thXs[0] + 4 + halfW, thY2 + 4, halfW, thH2 - 8);
-      ctx.restore();
-    }
-    const pw2d = 340;
-    const px2d = thXs[0] + (wDwgTotal - pw2d) / 2;
-    drawRoundedRect(px2d, thY2 + thH2 + 12, pw2d, 36, 18, '#8bd3be', '#f48c56', 2);
-    ctx.fillStyle = '#14251e';
-    ctx.font = '800 16px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('2D Assembly Drawing Auto', px2d + pw2d / 2, thY2 + thH2 + 36);
-    ctx.textAlign = 'left';
 
-    drawDocCard(thXs[2], thY2, thW, thH2, 'assets/design_stages/doc_sb_list.png', 'Cad Punching Board (Plug, Switch)', 340);
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillRect(x + 1, fy, w - 2, 1.2);
+
+      // Step Code Pill
+      drawRoundedRect(x + 14, fy + 11, 34, 26, 7, accent + '1A', accent + '66', 1);
+      ctx.fillStyle = accent;
+      fit(code, x + 31, fy + 29, 28, 12, '900', '"Prompt", sans-serif', 'center');
+
+      // Title
+      ctx.fillStyle = '#0F172A';
+      fit(labelText, x + 58, fy + 29, w - (subTag ? 174 : 74), 15.5, '800', '"Prompt", sans-serif', 'left');
+
+      // Subtle Format Sub-Tag on Right
+      if (subTag) {
+        ctx.fillStyle = '#64748B';
+        fit(subTag, x + w - 14, fy + 28, 108, 11.5, '700', '"JetBrains Mono", monospace', 'right');
+      }
+      ctx.restore();
+    }
+
+    const thXs = [rightX, rightX + colW + rightGap, rightX + (colW + rightGap) * 2];
+    const row1Y = 398;
+    const row1H = 294;
+    const row2Y = 714;
+    const row2H = 294;
+    const w2dWide = colW * 2 + rightGap;
+
+    // Row 1 (3 Output Cards)
+    drawCleanOutputCard(thXs[0], row1Y, colW, row1H, '01', '3D Visualization', '.SKP / C75', ['assets/design_stages/boq_3d_walls.png'], '#059669');
+    drawCleanOutputCard(thXs[1], row1Y, colW, row1H, '02', 'Part Items (BOM)', '.XLSX BOM', ['assets/design_stages/doc_part_items.png'], '#D97706');
+    drawCleanOutputCard(thXs[2], row1Y, colW, row1H, '03', 'Job Order', 'PRODUCTION', ['assets/design_stages/doc_job_order.png'], '#2563EB');
+
+    // Row 2 (2D Assembly Drawing Wide + CAD Punching Board)
+    drawCleanOutputCard(thXs[0], row2Y, w2dWide, row2H, '04', '2D Assembly Drawing Auto', 'SHOP DWG · ±1mm', ['assets/ver3/slide_06_cad_wall_layout.png', 'assets/ver3/slide_06_cad_detail_dwg.png'], '#0F766E');
+    drawCleanOutputCard(thXs[2], row2Y, colW, row2H, '05', 'CAD Punching Board', '.DXF / CNC', ['assets/design_stages/doc_sb_list.png'], '#7C3AED');
 
     ctx.restore();
   }
@@ -7323,7 +9170,7 @@
     const app=window.app;
     if(!app)return; // Running in Ver4 or canvas initialized dynamically
     // Migrate only the requested pacing/script fields, preserving edited visuals.
-    const pacingKey = '14m57s-v3-16slides-voice-sync-v5';
+    const pacingKey = '14m57s-v4-16slides-voice-sync-v7';
     let needsTiming = true;
     try {
       needsTiming = (localStorage.getItem('dbpa_ver3_pacing') !== pacingKey) ||
@@ -7390,25 +9237,30 @@
             // Tab 0: 475..735
             if (cx >= 475 && cx <= 735) {
               app._ver2SubStep = 0;
+              if (typeof app.render === 'function') app.render();
               return;
             }
             // Tab 1: 745..1035
             if (cx >= 745 && cx <= 1035) {
               app._ver2SubStep = 1;
+              if (typeof app.render === 'function') app.render();
               return;
             }
             // Tab 2: 1045..1275
             if (cx >= 1045 && cx <= 1275) {
               app._ver2SubStep = 2;
+              if (typeof app.render === 'function') app.render();
               return;
             }
             // Style toggles when on Step 0
             if (cx >= 1310 && cx <= 1510) {
               app.parallelBranchStyle = 'clean-minimal';
+              if (typeof app.render === 'function') app.render();
               return;
             }
             if (cx >= 1520 && cx <= 1700) {
               app.parallelBranchStyle = 'ver2-dark';
+              if (typeof app.render === 'function') app.render();
               return;
             }
           }
@@ -7419,88 +9271,176 @@
 
   // ==============================================================================
   // ENHANCED PROCEDURAL ANIMATION: NEW WORKFLOW 4-BRANCH PARALLEL PIPELINE
-  // Highly dynamic, engaging, living data-flow with traveling orbs & pulsing nodes
+  // Balanced full-canvas SCG HEIM Japanese Architectural layout + zero overlaps
   // ==============================================================================
   PresentationApp.prototype.drawCleanMinimalNewFlowchart = function(ctx, box, slide, animSec, nowSec) {
     ctx.save();
+    const bgPal = (typeof this.getCustomBackgroundPalette === 'function')
+      ? this.getCustomBackgroundPalette('washi')
+      : { preset: 'default', isDark: false };
 
-    // 1. Clean White Stage Card with Architectural Drop Shadow
+    const isDarkSurface = bgPal.preset === 'emerald-dark' || bgPal.preset === 'blueprint' || (bgPal.preset === 'custom' && bgPal.isDark);
     const cardX = box.x + 8;
     const cardY = box.y + 6;
     const cardW = box.w - 16;
     const cardH = box.h - 12;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 8;
+    // 1. SCG HEIM / Japanese Architectural Stage Backdrop Surface
+    if (typeof ctx.createLinearGradient === 'function') {
+      const surf = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+      if (bgPal.preset === 'washi') {
+        surf.addColorStop(0, '#fcfbf6');
+        surf.addColorStop(1, '#f3efe3');
+      } else if (bgPal.preset === 'white') {
+        surf.addColorStop(0, '#ffffff');
+        surf.addColorStop(1, '#f8fafc');
+      } else if (bgPal.preset === 'emerald-dark') {
+        surf.addColorStop(0, '#0f221b');
+        surf.addColorStop(1, '#142c24');
+      } else if (bgPal.preset === 'blueprint') {
+        surf.addColorStop(0, '#0d1e33');
+        surf.addColorStop(1, '#132a46');
+      } else if (bgPal.preset === 'custom') {
+        surf.addColorStop(0, bgPal.stops[0] || '#f6f8f7');
+        surf.addColorStop(1, bgPal.stops[bgPal.stops.length - 1] || '#eaf2ee');
+      } else {
+        // Default SCG HEIM Mint-Washi surface matching the rest of the deck
+        surf.addColorStop(0, '#f5faf7');
+        surf.addColorStop(0.5, '#ffffff');
+        surf.addColorStop(1, '#eef6f2');
+      }
+      ctx.fillStyle = surf;
+    } else {
+      ctx.fillStyle = '#ffffff';
+    }
     this.roundRect(ctx, cardX, cardY, cardW, cardH, 20);
     ctx.fill();
-    ctx.shadowColor = 'transparent';
-
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = isDarkSurface ? 'rgba(52, 211, 153, 0.35)' : '#b8d5c8';
+    ctx.lineWidth = 1.8;
     ctx.stroke();
 
     // Subtle Architectural Dot Grid
     ctx.save();
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.035)';
+    ctx.fillStyle = isDarkSurface ? 'rgba(52, 211, 153, 0.08)' : 'rgba(6, 95, 70, 0.05)';
     for (let gx = cardX + 32; gx < cardX + cardW - 20; gx += 32) {
       for (let gy = cardY + 32; gy < cardY + cardH - 20; gy += 32) {
-        ctx.beginPath();
-        ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
-        ctx.fill();
+        if (typeof ctx.arc === 'function') {
+          ctx.beginPath();
+          ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
     ctx.restore();
 
-    // Style Toggle Buttons in Top-Right
-    const styleTabs = [
-      { id: 'clean-minimal', label: '✨ สไตล์ 1: Clean Minimal (รูป New)' },
-      { id: 'ver2-dark', label: '🌙 สไตล์ 2: Ver 2 Dark Studio' }
+    const inkMain = isDarkSurface ? '#f8fafc' : '#0f172a';
+    const inkMuted = isDarkSurface ? '#cbd5e1' : '#475569';
+    const nodeFill = isDarkSurface ? '#152e25' : '#ffffff';
+    const nodeBorderMuted = isDarkSurface ? '#2e5949' : '#cbd5e1';
+
+    // 2. TIMELINE ANIMATION PHASES (10-Second Complete Story Cycle)
+    const cycleT = (animSec || 0) % 10.0;
+    let activePhase = 1;
+    if (cycleT < 2.0) activePhase = 1;
+    else if (cycleT < 4.5) activePhase = 2;
+    else if (cycleT < 7.5) activePhase = 3;
+    else activePhase = 4;
+
+    // 3. TOP ARCHITECTURAL HEADER & KPI STRIP (uses upper canvas space cleanly!)
+    const hdrX = cardX + 28, hdrY = cardY + 18, hdrW = cardW - 56, hdrH = 104;
+    ctx.save();
+    ctx.fillStyle = isDarkSurface ? 'rgba(15, 36, 28, 0.85)' : '#102820';
+    this.roundRect(ctx, hdrX, hdrY, hdrW, hdrH, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Header Kicker Pill
+    ctx.fillStyle = '#059669';
+    this.roundRect(ctx, hdrX + 20, hdrY + 14, 248, 22, 11);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    this.fillFittedText(ctx, 'NEW INTEGRATED DESIGN ENGINE', hdrX + 144, hdrY + 29, 232, 11, '800', '"Prompt", sans-serif', 'center');
+
+    // Header Title & Subtitle
+    ctx.fillStyle = '#ffffff';
+    this.fillFittedText(ctx, 'สถาปัตยกรรมระบบออกแบบอัตโนมัติ (4 สายงานคู่ขนาน)', hdrX + 20, hdrY + 64, 860, 26, '800', '"Prompt", sans-serif');
+    ctx.fillStyle = '#a7f3d0';
+    this.fillFittedText(ctx, '1 โมเดลกลาง OTF + Database & P-Rule ➔ แตกไฟล์ผลิตครบทุกแผนกในคลิกเดียว', hdrX + 20, hdrY + 91, 860, 14.5, '600', '"Prompt", sans-serif');
+
+    // Top-Right 3 KPI Summary Pills
+    const kpis = [
+      { badge: '⚡ ≤ 2 นาที', label: 'Auto Processing Time', sub: 'ลดจาก Manual 5-7 วัน', col: '#10b981' },
+      { badge: '🔀 4 Streams', label: 'Parallel Outputs Ready', sub: 'ไม่มี Key-in ซ้ำซ้อน', col: '#38bdf8' },
+      { badge: '🎯 100% / ±1mm', label: 'BOQ & CNC Precision', sub: 'ตรงแบบจริงหน้างาน', col: '#f59e0b' }
     ];
-    this.parallelStyleTabs = [];
-    const sTabW = 230;
-    const sTabH = 34;
-    const sTabY = cardY + 16;
-    const sTabStartX = cardX + cardW - (sTabW * 2 + 10) - 20;
-
-    styleTabs.forEach((st, idx) => {
-      const tx = sTabStartX + idx * (sTabW + 10);
-      const isCur = (this.parallelBranchStyle || 'clean-minimal') === st.id;
-      this.parallelStyleTabs.push({ id: st.id, x: tx, y: sTabY, w: sTabW, h: sTabH });
-
-      ctx.fillStyle = isCur ? '#059669' : '#F1F5F9';
-      this.roundRect(ctx, tx, sTabY, sTabW, sTabH, 8);
+    kpis.forEach((kp, ki) => {
+      const kw = 248, kh = 80, kx = hdrX + hdrW - (3 - ki) * (kw + 12), ky = hdrY + 12;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      this.roundRect(ctx, kx, ky, kw, kh, 12);
       ctx.fill();
-      ctx.strokeStyle = isCur ? '#047857' : '#CBD5E1';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = kp.col;
+      ctx.lineWidth = 1.4;
       ctx.stroke();
 
-      ctx.fillStyle = isCur ? '#FFFFFF' : '#475569';
-      this.fillFittedText(ctx, st.label, tx + sTabW / 2, sTabY + 22, sTabW - 16, 13, isCur ? '800' : '600', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = kp.col;
+      this.fillFittedText(ctx, kp.badge, kx + 14, ky + 28, kw - 28, 19, '800', '"Prompt", sans-serif');
+      ctx.fillStyle = '#f8fafc';
+      this.fillFittedText(ctx, kp.label, kx + 14, ky + 50, kw - 28, 13, '700', '"Prompt", sans-serif');
+      ctx.fillStyle = '#cbd5e1';
+      this.fillFittedText(ctx, kp.sub, kx + 14, ky + 68, kw - 28, 11.5, '600', '"Prompt", sans-serif');
+    });
+    ctx.restore();
+
+    // 4. CORE PREREQUISITES FOUNDATION STRIP feeding down into Auto BOM Hub
+    const otfBoxX = cardX + 46;
+    const otfBoxW = 204;
+    const hubBoxX = otfBoxX + otfBoxW + 62;
+    const hubBoxW = 296;
+
+    const preW = 266, preH = 68, preGap = 18;
+    const preTotalW = preW * 3 + preGap * 2;
+    const preStartX = Math.max(cardX + 340, hubBoxX - preW + 40);
+    const preY = hdrY + hdrH + 18;
+
+    const prereqs = [
+      { title: '1. Database (MIM / IM)', sub: 'คลัง Spec ผนัง & วัสดุมาตรฐาน', col: '#059669' },
+      { title: '2. Coding Rule', sub: 'รหัสอัจฉริยะ C / L / S / J / M / E', col: '#0284c7' },
+      { title: '3. Planing Rule (P-Rule)', sub: 'กติกาจัดแนว Grid ประตู & รอยต่ออัตโนมัติ', col: '#7c3aed' }
+    ];
+    prereqs.forEach((pr, pi) => {
+      const px = preStartX + pi * (preW + preGap);
+      ctx.save();
+      ctx.fillStyle = nodeFill;
+      this.roundRect(ctx, px, preY, preW, preH, 12);
+      ctx.fill();
+      ctx.strokeStyle = pr.col;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = pr.col;
+      this.roundRect(ctx, px + 10, preY + 10, 6, preH - 20, 3);
+      ctx.fill();
+
+      ctx.fillStyle = inkMain;
+      this.fillFittedText(ctx, pr.title, px + 26, preY + 29, preW - 36, 15.5, '800', '"Prompt", sans-serif');
+      ctx.fillStyle = inkMuted;
+      this.fillFittedText(ctx, pr.sub, px + 26, preY + 52, preW - 36, 12.5, '600', '"Prompt", sans-serif');
+      ctx.restore();
     });
 
-    // 2. TIMELINE ANIMATION PHASES (10-Second Complete Story Cycle matching 10s auto-progression)
-    const cycleT = (animSec || 0) % 10.0;
-    let activePhase = 0;
-    if (cycleT < 2.0) activePhase = 1;      // Ingest: OTF -> Auto BOM
-    else if (cycleT < 4.5) activePhase = 2; // Process: Auto BOM Engine (≤ 2 นาที)
-    else if (cycleT < 7.5) activePhase = 3; // Fan-out: 4 Parallel Branches
-    else activePhase = 4;                   // Deliver: Production Assembly Ready
-
-    // 3. MAIN FLOW COORDINATES
-    const centerY = cardY + cardH / 2 - 8;
-    const branchGap = 90;
-    const bY1 = centerY - 1.5 * branchGap;  // PartItems ── Purchase ──┐
-    const bY2 = centerY - 0.5 * branchGap;  // Job Order / Picking List ──➔
-    const bY3 = centerY + 0.5 * branchGap;  // SB List ➔ [ CAD EE Puning ] ── Lantex ── Cutting BP ──┐
-    const bY4 = centerY + 1.5 * branchGap;  // 2D & 3D Drawing ──────────────────────────────────┘
+    // 5. MAIN 4-BRANCH FLOW COORDINATES (Spacious, well-proportioned!)
+    const flowCenterY = cardY + 462;
+    const branchGap = 102;
+    const bY1 = flowCenterY - 1.5 * branchGap;
+    const bY2 = flowCenterY - 0.5 * branchGap;
+    const bY3 = flowCenterY + 0.5 * branchGap;
+    const bY4 = flowCenterY + 1.5 * branchGap;
 
     // HELPER: Animated Flow Pipe with Traveling Glowing Data Orbs
     function drawAnimatedFlowPipe(ctx, pts, color, nowSec, speed, hasArrow, numOrbs, trailColor, branchGlow) {
       if (!pts || pts.length < 2) return;
-
       let totalLen = 0;
       const segs = [];
       for (let i = 1; i < pts.length; i++) {
@@ -7518,90 +9458,79 @@
           const s = segs[i];
           if (d <= s.accum + s.len || i === segs.length - 1) {
             const t = s.len > 0 ? (d - s.accum) / s.len : 0;
-            return {
-              x: s.p1.x + s.dx * t,
-              y: s.p1.y + s.dy * t,
-              angle: Math.atan2(s.dy, s.dx)
-            };
+            return { x: s.p1.x + s.dx * t, y: s.p1.y + s.dy * t, angle: Math.atan2(s.dy, s.dx) };
           }
         }
         return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, angle: 0 };
       }
 
       ctx.save();
-
-      // Base Pipe Path (Dashed Architectural Line)
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = 2.6;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.setLineDash([8, 10]);
+      ctx.setLineDash([8, 9]);
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(pts[i].x, pts[i].y);
-      }
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Ambient pipe glow if branch is highlighted
       if (branchGlow) {
         ctx.strokeStyle = color;
         ctx.lineWidth = 8;
-        ctx.globalAlpha = 0.15 + 0.1 * Math.sin(nowSec * 5);
+        ctx.globalAlpha = 0.14 + 0.08 * Math.sin(nowSec * 5);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
       }
 
-      // Traveling Glowing Energy Packets (Orbs + Motion Blur Trails)
       const count = numOrbs || 2;
       const partSpacing = totalLen / Math.max(1, count);
-      const flowSpeed = (speed || 1.0) * 125;
+      const flowSpeed = (speed || 1.0) * 130;
       const baseOffset = (nowSec * flowSpeed) % totalLen;
 
       for (let p = 0; p < count; p++) {
         const curDist = (baseOffset + p * partSpacing) % totalLen;
         const curPt = getPointAt(curDist);
 
-        // Motion blur trailing sparks
         for (let t = 1; t <= 4; t++) {
           const tailDist = curDist - t * 8;
           if (tailDist >= 0) {
             const tailPt = getPointAt(tailDist);
             ctx.fillStyle = trailColor || color;
             ctx.globalAlpha = 0.45 / t;
-            ctx.beginPath();
-            ctx.arc(tailPt.x, tailPt.y, Math.max(1.5, 4.5 - t * 0.8), 0, Math.PI * 2);
-            ctx.fill();
+            if (typeof ctx.arc === 'function') {
+              ctx.beginPath();
+              ctx.arc(tailPt.x, tailPt.y, Math.max(1.5, 4.5 - t * 0.8), 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
         }
         ctx.globalAlpha = 1.0;
 
-        // Glowing Radial Flare
-        const grad = ctx.createRadialGradient(curPt.x, curPt.y, 0, curPt.x, curPt.y, 15);
-        grad.addColorStop(0, '#FFFFFF');
-        grad.addColorStop(0.35, color);
-        grad.addColorStop(0.75, color);
-        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(curPt.x, curPt.y, 15, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Bright Energy Center
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(curPt.x, curPt.y, 3.5, 0, Math.PI * 2);
-        ctx.fill();
+        if (typeof ctx.createRadialGradient === 'function' && typeof ctx.arc === 'function') {
+          const grad = ctx.createRadialGradient(curPt.x, curPt.y, 0, curPt.x, curPt.y, 14);
+          grad.addColorStop(0, '#FFFFFF');
+          grad.addColorStop(0.4, color);
+          grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(curPt.x, curPt.y, 14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (typeof ctx.arc === 'function') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(curPt.x, curPt.y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      // Directional Arrow Head
       if (hasArrow && pts.length >= 2) {
         const endPt = pts[pts.length - 1];
         const prevPt = pts[pts.length - 2];
         const angle = Math.atan2(endPt.y - prevPt.y, endPt.x - prevPt.x);
         const headLen = 12;
-
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.moveTo(endPt.x, endPt.y);
@@ -7614,370 +9543,344 @@
       ctx.restore();
     }
 
-    // 4. NODE 1: OTF (Forcon.) INPUT BOX
-    const otfBoxX = cardX + 65;
-    const otfBoxW = 165;
-    const otfBoxH = 96;
-    const otfBoxY = centerY - otfBoxH / 2;
+    // Helper for clean pill nodes along each branch (eliminates floating text overlap)
+    const drawBranchNode = (x, y, text, accentCol, bgCol, widthPad = 28) => {
+      ctx.save();
+      ctx.font = '800 17px "Prompt", sans-serif';
+      const w = Math.max(88, ctx.measureText(text).width + widthPad);
+      const h = 38;
+      ctx.fillStyle = bgCol || nodeFill;
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 2;
+      this.roundRect(ctx, x, y - h / 2, w, h, 10);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = accentCol;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = bgCol && bgCol !== '#ffffff' && bgCol !== nodeFill ? '#ffffff' : inkMain;
+      ctx.textAlign = 'center';
+      ctx.fillText(text, x + w / 2, y + 6);
+      ctx.textAlign = 'left';
+      ctx.restore();
+      return w;
+    };
+
+    // 6. NODE 1: OTF (Forcon.) INPUT BOX (Widened so badge fits cleanly!)
+    const otfBoxH = 124;
+    const otfBoxY = flowCenterY - otfBoxH / 2;
     const isOtfActive = activePhase === 1;
 
     ctx.save();
-    // Soft Blue Glow Halo
-    ctx.shadowColor = isOtfActive ? 'rgba(59, 130, 246, 0.45)' : 'rgba(59, 130, 246, 0.15)';
-    ctx.shadowBlur = isOtfActive ? 20 + 8 * Math.sin(nowSec * 6) : 10;
-    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = isOtfActive ? 'rgba(59, 130, 246, 0.45)' : 'rgba(59, 130, 246, 0.14)';
+    ctx.shadowBlur = isOtfActive ? 20 + 6 * Math.sin(nowSec * 6) : 10;
+    ctx.fillStyle = nodeFill;
     this.roundRect(ctx, otfBoxX, otfBoxY, otfBoxW, otfBoxH, 18);
     ctx.fill();
     ctx.shadowColor = 'transparent';
 
-    ctx.strokeStyle = isOtfActive ? '#2563EB' : '#94A3B8';
-    ctx.lineWidth = isOtfActive ? 3.0 : 2.4;
+    ctx.strokeStyle = isOtfActive ? '#2563EB' : '#60A5FA';
+    ctx.lineWidth = isOtfActive ? 3.2 : 2.2;
     ctx.stroke();
 
-    // Architectural Corner Tick Accents
-    ctx.strokeStyle = '#3B82F6';
-    ctx.lineWidth = 2;
-    const cTick = 8;
-    ctx.beginPath();
-    ctx.moveTo(otfBoxX + 8, otfBoxY + 8 + cTick); ctx.lineTo(otfBoxX + 8, otfBoxY + 8); ctx.lineTo(otfBoxX + 8 + cTick, otfBoxY + 8);
-    ctx.moveTo(otfBoxX + otfBoxW - 8 - cTick, otfBoxY + 8); ctx.lineTo(otfBoxX + otfBoxW - 8, otfBoxY + 8); ctx.lineTo(otfBoxX + otfBoxW - 8, otfBoxY + 8 + cTick);
-    ctx.stroke();
-
-    // Live Pill Badge above Box
-    ctx.fillStyle = isOtfActive ? '#3B82F6' : '#E2E8F0';
-    this.roundRect(ctx, otfBoxX + 16, otfBoxY - 14, otfBoxW - 32, 22, 11);
+    // Widened Pill Badge above Box (fit 100% cleanly without overflow!)
+    ctx.fillStyle = isOtfActive ? '#2563EB' : '#DBEAFE';
+    this.roundRect(ctx, otfBoxX + 10, otfBoxY - 14, otfBoxW - 20, 24, 12);
     ctx.fill();
-    ctx.fillStyle = isOtfActive ? '#FFFFFF' : '#475569';
-    ctx.font = '800 11px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('📥 ARCHITECTURAL INPUT', otfBoxX + otfBoxW / 2, otfBoxY + 2);
-    ctx.textAlign = 'left';
+    ctx.fillStyle = isOtfActive ? '#FFFFFF' : '#1E40AF';
+    this.fillFittedText(ctx, '📥 ARCHITECTURAL INPUT', otfBoxX + otfBoxW / 2, otfBoxY + 2, otfBoxW - 32, 11, '800', '"Prompt", sans-serif', 'center');
 
-    // Text: OTF
-    ctx.fillStyle = '#0F172A';
-    this.fillFittedText(ctx, 'OTF', otfBoxX + otfBoxW / 2, otfBoxY + 44, otfBoxW - 24, 25, '800', '"Prompt", sans-serif', 'center');
-    ctx.fillStyle = '#64748B';
-    this.fillFittedText(ctx, '(Forcon.)', otfBoxX + otfBoxW / 2, otfBoxY + 74, otfBoxW - 24, 16.5, '600', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = inkMain;
+    this.fillFittedText(ctx, 'OTF', otfBoxX + otfBoxW / 2, otfBoxY + 54, otfBoxW - 24, 28, '800', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = inkMuted;
+    this.fillFittedText(ctx, '(Forcon.)', otfBoxX + otfBoxW / 2, otfBoxY + 84, otfBoxW - 24, 17, '600', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = '#2563EB';
+    this.fillFittedText(ctx, '2D Plan & Wall Spec', otfBoxX + otfBoxW / 2, otfBoxY + 108, otfBoxW - 24, 12, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
-    // 5. NODE 2: CORE HUB BOX — Auto BOM & Drawing (SketchUp)
-    const hubBoxX = otfBoxX + otfBoxW + 65;
-    const hubBoxW = 280;
-    const hubBoxH = 104;
-    const hubBoxY = centerY - hubBoxH / 2;
+    // 7. NODE 2: CORE HUB BOX — Auto BOM & Drawing (Gear cleanly separated!)
+    const hubBoxH = 132;
+    const hubBoxY = flowCenterY - hubBoxH / 2;
     const isHubActive = activePhase === 2;
+
+    // Animated feed pipes from Prerequisites down into Auto BOM Hub
+    prereqs.forEach((pr, pi) => {
+      const startX = preStartX + pi * (preW + preGap) + preW / 2;
+      const targetX = hubBoxX + 60 + pi * 88;
+      drawAnimatedFlowPipe(ctx, [
+        { x: startX, y: preY + preH },
+        { x: startX, y: preY + preH + 18 },
+        { x: targetX, y: preY + preH + 18 },
+        { x: targetX, y: hubBoxY - 16 }
+      ], pr.col, nowSec, 0.9, true, 1, pr.col, isHubActive);
+    });
 
     // Animated Pipe: OTF -> Auto BOM
     drawAnimatedFlowPipe(ctx, [
-      { x: otfBoxX + otfBoxW, y: centerY },
-      { x: hubBoxX, y: centerY }
+      { x: otfBoxX + otfBoxW, y: flowCenterY },
+      { x: hubBoxX, y: flowCenterY }
     ], '#059669', nowSec, 1.25, true, 2, '#34D399', isOtfActive || isHubActive);
 
-    // Auto BOM Card Container
     ctx.save();
-    ctx.shadowColor = isHubActive ? 'rgba(16, 185, 129, 0.55)' : 'rgba(16, 185, 129, 0.22)';
-    ctx.shadowBlur = isHubActive ? 25 + 10 * Math.sin(nowSec * 6) : 12;
-    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = isHubActive ? 'rgba(16, 185, 129, 0.52)' : 'rgba(16, 185, 129, 0.18)';
+    ctx.shadowBlur = isHubActive ? 24 + 8 * Math.sin(nowSec * 6) : 12;
+    ctx.fillStyle = nodeFill;
     this.roundRect(ctx, hubBoxX, hubBoxY, hubBoxW, hubBoxH, 18);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-
     ctx.strokeStyle = isHubActive ? '#10B981' : '#059669';
-    ctx.lineWidth = isHubActive ? 3.6 : 3.0;
+    ctx.lineWidth = isHubActive ? 3.4 : 2.6;
     ctx.stroke();
 
-    // Live Engine Status Pill above Box
-    ctx.fillStyle = isHubActive ? '#10B981' : '#E6F4EA';
-    this.roundRect(ctx, hubBoxX + 22, hubBoxY - 15, hubBoxW - 44, 24, 12);
+    // Top Auto Engine Pill (clearly separated from gear!)
+    ctx.fillStyle = isHubActive ? '#10B981' : '#D1FAE5';
+    this.roundRect(ctx, hubBoxX + 18, hubBoxY - 15, hubBoxW - 64, 24, 12);
     ctx.fill();
     ctx.strokeStyle = '#10B981';
     ctx.lineWidth = 1.2;
     ctx.stroke();
     ctx.fillStyle = isHubActive ? '#FFFFFF' : '#065F46';
-    ctx.font = '800 11.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('⚡ AUTO ENGINE (≤ 2 นาที)', hubBoxX + hubBoxW / 2, hubBoxY + 2);
-    ctx.textAlign = 'left';
+    this.fillFittedText(ctx, '⚡ AUTO ENGINE (≤ 2 นาที)', hubBoxX + 18 + (hubBoxW - 64) / 2, hubBoxY + 1, hubBoxW - 80, 11.5, '800', '"Prompt", sans-serif', 'center');
 
-    // Animated Rotating High-Tech Gear Icon in Top-Right
+    // Animated Gear safely positioned top-right corner clear of pill!
     ctx.save();
-    ctx.translate(hubBoxX + hubBoxW - 24, hubBoxY + 24);
+    ctx.translate(hubBoxX + hubBoxW - 22, hubBoxY + 26);
     ctx.rotate(nowSec * 2.2);
     ctx.strokeStyle = '#10B981';
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 1.8;
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.arc(0, 0, 10, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#10B981';
-    ctx.beginPath();
-    ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (typeof ctx.arc === 'function') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#10B981';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
-    // Text: Auto BOM & Drawing
-    ctx.fillStyle = '#0F172A';
-    this.fillFittedText(ctx, 'Auto BOM & Drawing', hubBoxX + hubBoxW / 2, hubBoxY + 45, hubBoxW - 32, 21.5, '800', '"Prompt", sans-serif', 'center');
-    ctx.fillStyle = '#047857';
-    this.fillFittedText(ctx, '(SketchUp Automation)', hubBoxX + hubBoxW / 2, hubBoxY + 74, hubBoxW - 32, 16.5, '700', '"Prompt", sans-serif', 'center');
-
-    // Bottom Check Status Ticker inside Box
-    ctx.fillStyle = '#64748B';
-    ctx.font = '600 11px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('✓ Logic & P-Rule Synced 100%', hubBoxX + hubBoxW / 2, hubBoxY + 95);
-    ctx.textAlign = 'left';
+    ctx.fillStyle = inkMain;
+    this.fillFittedText(ctx, 'Auto BOM & Drawing', hubBoxX + hubBoxW / 2, hubBoxY + 54, hubBoxW - 36, 22, '800', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = isDarkSurface ? '#6ee7b7' : '#047857';
+    this.fillFittedText(ctx, '(SketchUp Automation)', hubBoxX + hubBoxW / 2, hubBoxY + 84, hubBoxW - 36, 17, '700', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = inkMuted;
+    this.fillFittedText(ctx, '✓ Logic & P-Rule Synced 100%', hubBoxX + hubBoxW / 2, hubBoxY + 112, hubBoxW - 36, 12, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
-    // 6. FAN-OUT BUS FROM AUTO BOM TO 4 BRANCHES
+    // 8. FAN-OUT BUS FROM AUTO BOM TO 4 BRANCHES
     const trunkX = hubBoxX + hubBoxW + 38;
-
-    // Horizontal line from hub right edge to trunkX
     ctx.save();
     ctx.strokeStyle = '#059669';
-    ctx.lineWidth = 2.8;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(hubBoxX + hubBoxW, centerY);
-    ctx.lineTo(trunkX, centerY);
-    ctx.stroke();
-
-    // Vertical bus line spanning bY1 to bY4 with pulsing glow
-    ctx.beginPath();
+    ctx.moveTo(hubBoxX + hubBoxW, flowCenterY);
+    ctx.lineTo(trunkX, flowCenterY);
     ctx.moveTo(trunkX, bY1);
     ctx.lineTo(trunkX, bY4);
     ctx.stroke();
 
-    // Bus junction pulse rings
     ctx.fillStyle = '#10B981';
     [bY1, bY2, bY3, bY4].forEach(by => {
-      ctx.beginPath();
-      ctx.arc(trunkX, by, 4.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (typeof ctx.arc === 'function') {
+        ctx.beginPath();
+        ctx.arc(trunkX, by, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
     ctx.restore();
 
-    // 7. DESTINATION: Production BOX (Centered at centerY)
-    const destBoxW = 230;
-    const destBoxH = 104;
-    const destBoxX = cardX + cardW - destBoxW - 55;
-    const destBoxY = centerY - destBoxH / 2;
+    // 9. DESTINATION: Production BOX
+    const destBoxW = 248;
+    const destBoxH = 128;
+    const destBoxX = cardX + cardW - destBoxW - 44;
+    const destBoxY = flowCenterY - destBoxH / 2;
     const isDestActive = activePhase === 4;
 
     ctx.save();
-    // Receiving ripple wave rings whenever data orbs arrive
     if (isDestActive) {
       const ripT = (nowSec * 3) % 1.5;
       ctx.strokeStyle = 'rgba(16, 185, 129, ' + Math.max(0, 0.6 - ripT * 0.4) + ')';
       ctx.lineWidth = 2.5;
-      this.roundRect(ctx, destBoxX - ripT * 12, destBoxY - ripT * 12, destBoxW + ripT * 24, destBoxH + ripT * 24, 24);
+      this.roundRect(ctx, destBoxX - ripT * 10, destBoxY - ripT * 10, destBoxW + ripT * 20, destBoxH + ripT * 20, 22);
       ctx.stroke();
     }
-
-    ctx.shadowColor = isDestActive ? 'rgba(16, 185, 129, 0.45)' : 'rgba(16, 185, 129, 0.18)';
-    ctx.shadowBlur = isDestActive ? 24 : 12;
-    ctx.fillStyle = '#D1FAE5';
+    ctx.shadowColor = isDestActive ? 'rgba(16, 185, 129, 0.45)' : 'rgba(16, 185, 129, 0.16)';
+    ctx.shadowBlur = isDestActive ? 22 : 12;
+    ctx.fillStyle = isDarkSurface ? '#064e3b' : '#D1FAE5';
     this.roundRect(ctx, destBoxX, destBoxY, destBoxW, destBoxH, 18);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-
     ctx.strokeStyle = '#059669';
     ctx.lineWidth = 3.2;
     ctx.stroke();
 
-    // Factory Pill Badge above Box
-    ctx.fillStyle = isDestActive ? '#059669' : '#A7F3D0';
-    this.roundRect(ctx, destBoxX + 20, destBoxY - 15, destBoxW - 40, 24, 12);
+    ctx.fillStyle = isDestActive ? '#059669' : '#10B981';
+    this.roundRect(ctx, destBoxX + 18, destBoxY - 15, destBoxW - 36, 24, 12);
     ctx.fill();
-    ctx.fillStyle = isDestActive ? '#FFFFFF' : '#065F46';
-    ctx.font = '800 11.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🏭 FACTORY ASSEMBLY', destBoxX + destBoxW / 2, destBoxY + 2);
-    ctx.textAlign = 'left';
+    ctx.fillStyle = '#FFFFFF';
+    this.fillFittedText(ctx, '🏭 FACTORY ASSEMBLY', destBoxX + destBoxW / 2, destBoxY + 1, destBoxW - 48, 11.5, '800', '"Prompt", sans-serif', 'center');
 
-    // Title: Production
-    ctx.fillStyle = '#0F172A';
-    this.fillFittedText(ctx, 'Production', destBoxX + destBoxW / 2, destBoxY + 54, destBoxW - 28, 27, '800', '"Prompt", sans-serif', 'center');
-
-    // Subtitle: ±1mm Precision
-    ctx.fillStyle = '#047857';
-    ctx.font = '700 14px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('✓ พร้อมผลิต & ประกอบ ±1mm', destBoxX + destBoxW / 2, destBoxY + 84);
-    ctx.textAlign = 'left';
+    ctx.fillStyle = isDarkSurface ? '#FFFFFF' : '#0F172A';
+    this.fillFittedText(ctx, 'Production', destBoxX + destBoxW / 2, destBoxY + 62, destBoxW - 28, 28, '800', '"Prompt", sans-serif', 'center');
+    ctx.fillStyle = isDarkSurface ? '#6ee7b7' : '#047857';
+    this.fillFittedText(ctx, '✓ พร้อมผลิต & ประกอบ ±1mm', destBoxX + destBoxW / 2, destBoxY + 96, destBoxW - 28, 14, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
-    // 8. FOUR PARALLEL BRANCHES WITH VIBRANT ANIMATIONS
-    const bStartX = trunkX + 40;
+    // 10. FOUR PARALLEL BRANCHES (Clean Pill Nodes + Floating Tag CLEARLY above at -38px)
+    const bStartX = trunkX + 42;
     const isFanActive = activePhase === 3 || activePhase === 4;
 
-    // ----- BRANCH 1: PartItems ── Purchase ──────────────────────────────────┐ ➔ Production -----
+    const drawBranchTag = (x, y, label, col, tint) => {
+      ctx.save();
+      ctx.font = '700 11px "Prompt", sans-serif';
+      const w = Math.max(122, ctx.measureText(label).width + 20);
+      ctx.fillStyle = tint;
+      this.roundRect(ctx, x, y, w, 20, 10);
+      ctx.fill();
+      ctx.fillStyle = col;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + w / 2, y + 14);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    };
+
+    // ----- BRANCH 1: PartItems -> Purchase -> Production -----
     const colB1 = '#0284C7';
-    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY1 }, { x: bStartX - 10, y: bY1 }], colB1, nowSec, 1.25, false, 1, '#38BDF8', isFanActive);
+    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY1 }, { x: bStartX, y: bY1 }], colB1, nowSec, 1.25, false, 1, '#38BDF8', isFanActive);
+    const wPart = drawBranchNode(bStartX, bY1, 'PartItems', colB1);
+    drawBranchTag(bStartX, bY1 - 42, '📦 BOM Auto Export (.XLSX)', colB1, 'rgba(2, 132, 199, 0.14)');
 
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('PartItems', bStartX, bY1 + 6);
-    const partW = ctx.measureText('PartItems').width;
-
-    const partToPurchLineStartX = bStartX + partW + 16;
-    const partToPurchLineEndX = partToPurchLineStartX + 75;
-    drawAnimatedFlowPipe(ctx, [{ x: partToPurchLineStartX, y: bY1 }, { x: partToPurchLineEndX, y: bY1 }], colB1, nowSec, 1.25, false, 1, '#38BDF8', isFanActive);
-
-    const purchX = partToPurchLineEndX + 16;
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('Purchase', purchX, bY1 + 6);
-    const purchW = ctx.measureText('Purchase').width;
+    const pToPStart = bStartX + wPart;
+    const pToPEnd = pToPStart + 74;
+    drawAnimatedFlowPipe(ctx, [{ x: pToPStart, y: bY1 }, { x: pToPEnd, y: bY1 }], colB1, nowSec, 1.25, true, 1, '#38BDF8', isFanActive);
+    const wPurch = drawBranchNode(pToPEnd + 4, bY1, 'Purchase & MRP', colB1);
 
     const turnDownX = destBoxX + destBoxW * 0.65;
     drawAnimatedFlowPipe(ctx, [
-      { x: purchX + purchW + 16, y: bY1 },
+      { x: pToPEnd + 4 + wPurch, y: bY1 },
       { x: turnDownX, y: bY1 },
-      { x: turnDownX, y: destBoxY }
+      { x: turnDownX, y: destBoxY - 15 }
     ], colB1, nowSec, 1.3, true, 2, '#38BDF8', isFanActive);
 
-    // Micro Floating Tag: BOM Excel
-    ctx.save();
-    const tag1Y = bY1 - 22 + Math.sin(nowSec * 3) * 2;
-    ctx.fillStyle = 'rgba(2, 132, 199, 0.12)';
-    this.roundRect(ctx, bStartX, tag1Y, 110, 18, 9);
-    ctx.fill();
-    ctx.fillStyle = colB1;
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('📦 BOM Auto Export', bStartX + 8, tag1Y + 13);
-    ctx.restore();
-
-    // ----- BRANCH 2: Job Order / Picking List ────────────────────────────────➔ Production -----
+    // ----- BRANCH 2: Job Order / Picking List -> Production -----
     const colB2 = '#D97706';
-    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY2 }, { x: bStartX - 10, y: bY2 }], colB2, nowSec, 1.25, false, 1, '#FBBF24', isFanActive);
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('Job Order / Picking List', bStartX, bY2 + 6);
-    const jobW = ctx.measureText('Job Order / Picking List').width;
-
+    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY2 }, { x: bStartX, y: bY2 }], colB2, nowSec, 1.25, false, 1, '#FBBF24', isFanActive);
+    const wJob = drawBranchNode(bStartX, bY2, 'Job Order / Picking List', colB2);
+    drawBranchTag(bStartX, bY2 - 42, '📋 Picking Sheet S230 (.PDF)', colB2, 'rgba(217, 119, 6, 0.14)');
     drawAnimatedFlowPipe(ctx, [
-      { x: bStartX + jobW + 18, y: bY2 },
+      { x: bStartX + wJob, y: bY2 },
       { x: destBoxX, y: bY2 }
     ], colB2, nowSec, 1.3, true, 2, '#FBBF24', isFanActive);
 
-    // Micro Floating Tag: Sheet S230
-    ctx.save();
-    const tag2Y = bY2 - 22 + Math.sin(nowSec * 3 + 1) * 2;
-    ctx.fillStyle = 'rgba(217, 119, 6, 0.12)';
-    this.roundRect(ctx, bStartX, tag2Y, 115, 18, 9);
-    ctx.fill();
-    ctx.fillStyle = colB2;
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('📋 Picking Sheet S230', bStartX + 8, tag2Y + 13);
-    ctx.restore();
-
-    // ----- BRANCH 3: SB List ➔ CAD EE Puning ── Lantex ── Cutting BP ────────┐ ➔ Production -----
+    // ----- BRANCH 3: SB List -> CAD EE Punching -> Lantek -> Cutting BP -> Production -----
     const colB3 = '#7C3AED';
-    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY3 }, { x: bStartX - 10, y: bY3 }], colB3, nowSec, 1.25, false, 1, '#A78BFA', isFanActive);
+    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY3 }, { x: bStartX, y: bY3 }], colB3, nowSec, 1.25, false, 1, '#A78BFA', isFanActive);
+    const wSB = drawBranchNode(bStartX, bY3, 'SB List', colB3);
+    drawBranchTag(bStartX, bY3 - 42, '⚡ CNC Punching DXF + EE', colB3, 'rgba(124, 58, 237, 0.14)');
 
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('SB List', bStartX, bY3 + 6);
-    const sbW = ctx.measureText('SB List').width;
+    const cadX = bStartX + wSB + 46;
+    drawAnimatedFlowPipe(ctx, [{ x: bStartX + wSB, y: bY3 }, { x: cadX, y: bY3 }], colB3, nowSec, 1.25, true, 1, '#A78BFA', isFanActive);
+    const wCad = drawBranchNode(cadX, bY3, '⚡ CAD EE Punching', colB3, '#6D28D9', 32);
 
-    const cadBoxX = bStartX + sbW + 42;
-    const cadBoxW = 185;
-    const cadBoxH = 46;
-    const cadBoxY = bY3 - cadBoxH / 2;
+    const lanX = cadX + wCad + 46;
+    drawAnimatedFlowPipe(ctx, [{ x: cadX + wCad, y: bY3 }, { x: lanX, y: bY3 }], colB3, nowSec, 1.25, true, 1, '#A78BFA', isFanActive);
+    const wLan = drawBranchNode(lanX, bY3, 'Lantek', colB3);
 
-    drawAnimatedFlowPipe(ctx, [{ x: bStartX + sbW + 10, y: bY3 }, { x: cadBoxX, y: bY3 }], colB3, nowSec, 1.25, true, 1, '#A78BFA', isFanActive);
+    const cutX = lanX + wLan + 46;
+    drawAnimatedFlowPipe(ctx, [{ x: lanX + wLan, y: bY3 }, { x: cutX, y: bY3 }], colB3, nowSec, 1.25, true, 1, '#A78BFA', isFanActive);
+    const wCut = drawBranchNode(cutX, bY3, 'Cutting BP', colB3);
 
-    // CAD EE Puning Box (Enhanced with glowing pulse)
-    ctx.save();
-    ctx.shadowColor = 'rgba(124, 58, 237, 0.25)';
-    ctx.shadowBlur = 10 + 4 * Math.sin(nowSec * 4);
-    ctx.fillStyle = '#FFFFFF';
-    this.roundRect(ctx, cadBoxX, cadBoxY, cadBoxW, cadBoxH, 12);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-
-    ctx.strokeStyle = colB3;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-
-    ctx.fillStyle = '#5B21B6';
-    this.fillFittedText(ctx, '⚡ CAD EE Puning', cadBoxX + cadBoxW / 2, cadBoxY + 28, cadBoxW - 16, 16.5, '800', '"Prompt", sans-serif', 'center');
-    ctx.restore();
-
-    // Line from CAD EE Puning to Lantex
-    const lantexStartX = cadBoxX + cadBoxW + 14;
-    const lantexEndX = lantexStartX + 42;
-    drawAnimatedFlowPipe(ctx, [{ x: lantexStartX, y: bY3 }, { x: lantexEndX, y: bY3 }], colB3, nowSec, 1.25, false, 1, '#A78BFA', isFanActive);
-
-    const lantexX = lantexEndX + 14;
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('Lantex', lantexX, bY3 + 6);
-    const lantexW = ctx.measureText('Lantex').width;
-
-    const cutLineStartX = lantexX + lantexW + 14;
-    const cutLineEndX = cutLineStartX + 42;
-    drawAnimatedFlowPipe(ctx, [{ x: cutLineStartX, y: bY3 }, { x: cutLineEndX, y: bY3 }], colB3, nowSec, 1.25, false, 1, '#A78BFA', isFanActive);
-
-    const cutX = cutLineEndX + 14;
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('Cutting BP', cutX, bY3 + 6);
-    const cutW = ctx.measureText('Cutting BP').width;
-
-    const b3TurnUpX = destBoxX - 18;
+    const b3TurnUpX = destBoxX - 24;
     drawAnimatedFlowPipe(ctx, [
-      { x: cutX + cutW + 14, y: bY3 },
+      { x: cutX + wCut, y: bY3 },
       { x: b3TurnUpX, y: bY3 },
-      { x: b3TurnUpX, y: destBoxY + destBoxH - 18 },
-      { x: destBoxX, y: destBoxY + destBoxH - 18 }
+      { x: b3TurnUpX, y: destBoxY + destBoxH - 22 },
+      { x: destBoxX, y: destBoxY + destBoxH - 22 }
     ], colB3, nowSec, 1.3, true, 2, '#A78BFA', isFanActive);
 
-    // Micro Floating Tag: CNC Punching
-    ctx.save();
-    const tag3Y = bY3 - 24 + Math.sin(nowSec * 3 + 2) * 2;
-    ctx.fillStyle = 'rgba(124, 58, 237, 0.12)';
-    this.roundRect(ctx, bStartX, tag3Y, 115, 18, 9);
-    ctx.fill();
-    ctx.fillStyle = colB3;
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('⚡ CNC Punching DXF', bStartX + 8, tag3Y + 13);
-    ctx.restore();
-
-    // ----- BRANCH 4: 2D & 3D Drawing ────────────────────────────────────────┐ ➔ Production -----
+    // ----- BRANCH 4: 2D & 3D Drawing -> Production -----
     const colB4 = '#059669';
-    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY4 }, { x: bStartX - 10, y: bY4 }], colB4, nowSec, 1.25, false, 1, '#34D399', isFanActive);
+    drawAnimatedFlowPipe(ctx, [{ x: trunkX, y: bY4 }, { x: bStartX, y: bY4 }], colB4, nowSec, 1.25, false, 1, '#34D399', isFanActive);
+    const wDwg = drawBranchNode(bStartX, bY4, '2D & 3D Drawing', colB4);
+    drawBranchTag(bStartX, bY4 - 42, '📐 Shop DWG & 3D Model (.DWG/.SKP)', colB4, 'rgba(5, 150, 105, 0.14)');
 
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 19px "Prompt", sans-serif';
-    ctx.fillText('2D & 3D Drawing', bStartX, bY4 + 6);
-    const dwgW = ctx.measureText('2D & 3D Drawing').width;
-
-    const b4TurnUpX = destBoxX - 8;
+    const b4TurnUpX = destBoxX - 10;
     drawAnimatedFlowPipe(ctx, [
-      { x: bStartX + dwgW + 18, y: bY4 },
+      { x: bStartX + wDwg, y: bY4 },
       { x: b4TurnUpX, y: bY4 },
-      { x: b4TurnUpX, y: destBoxY + destBoxH - 6 },
-      { x: destBoxX, y: destBoxY + destBoxH - 6 }
+      { x: b4TurnUpX, y: destBoxY + destBoxH - 4 },
+      { x: destBoxX, y: destBoxY + destBoxH - 4 }
     ], colB4, nowSec, 1.3, true, 2, '#34D399', isFanActive);
 
-    // Micro Floating Tag: Shop DWG
+    // 11. BOTTOM LIVE DELIVERABLE THUMBNAIL STRIP (uses lower canvas space cleanly!)
+    const stripY = cardY + cardH - 270;
+    const stripH = 198;
+    const stripX = cardX + 28;
+    const stripW = cardW - 56;
+
     ctx.save();
-    const tag4Y = bY4 - 22 + Math.sin(nowSec * 3 + 3) * 2;
-    ctx.fillStyle = 'rgba(5, 150, 105, 0.12)';
-    this.roundRect(ctx, bStartX, tag4Y, 120, 18, 9);
+    ctx.fillStyle = isDarkSurface ? 'rgba(15, 36, 28, 0.72)' : 'rgba(241, 248, 245, 0.92)';
+    this.roundRect(ctx, stripX, stripY, stripW, stripH, 16);
     ctx.fill();
-    ctx.fillStyle = colB4;
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('📐 Shop DWG & 3D SKP', bStartX + 8, tag4Y + 13);
+    ctx.strokeStyle = isDarkSurface ? 'rgba(52, 211, 153, 0.28)' : '#cbd5e1';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = inkMain;
+    this.fillFittedText(ctx, '📄 OUTPUT DELIVERABLES PREVIEW — ผลผลิตจริงที่สร้างอัตโนมัติพร้อมส่งทุกสายงาน', stripX + 18, stripY + 26, stripW - 36, 15, '800', '"Prompt", sans-serif');
+
+    const docs = this.factoryDocs || {};
+    const thumbCards = [
+      { title: '00 • 3D Model (.SKP)', sub: 'โครงสร้างผนังทั้งหลัง', img: docs.model3d, col: '#059669' },
+      { title: '01 • PartItems (BOM)', sub: 'ถอดปริมาณ PO Auto (.XLSX)', img: docs.partItems, col: '#0284C7' },
+      { title: '02 • Job Order (S230)', sub: 'ใบสั่งผลิต & Picking (.PDF)', img: docs.jobOrder, col: '#D97706' },
+      { title: '03 • SB List & EE', sub: 'CAD Punching + Lantek (.DXF)', img: docs.sbList, col: '#7C3AED' },
+      { title: '04 • Shop Drawing', sub: 'แบบประกอบ ±1mm (.DWG)', img: docs.drawingAssembly, col: '#10B981' }
+    ];
+    const tcGap = 14;
+    const tcW = (stripW - 36 - tcGap * 4) / 5;
+    const tcY = stripY + 38;
+    const tcH = 148;
+
+    thumbCards.forEach((tc, ti) => {
+      const tx = stripX + 18 + ti * (tcW + tcGap);
+      const isLit = (activePhase === 3 && ti > 0) || (activePhase === 4);
+      ctx.save();
+      ctx.fillStyle = nodeFill;
+      this.roundRect(ctx, tx, tcY, tcW, tcH, 12);
+      ctx.fill();
+      ctx.strokeStyle = isLit ? tc.col : nodeBorderMuted;
+      ctx.lineWidth = isLit ? 2.2 : 1.2;
+      ctx.stroke();
+
+      // Thumbnail frame
+      const imBoxX = tx + 8, imBoxY = tcY + 8, imBoxW = tcW - 16, imBoxH = 92;
+      ctx.fillStyle = isDarkSurface ? '#0f172a' : '#f1f5f9';
+      this.roundRect(ctx, imBoxX, imBoxY, imBoxW, imBoxH, 8);
+      ctx.fill();
+      ctx.strokeStyle = isDarkSurface ? '#1e293b' : '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (tc.img && tc.img.complete && tc.img.naturalWidth > 0 && typeof this.drawMediaContain === 'function') {
+        this.drawMediaContain(ctx, tc.img, tc.img.naturalWidth, tc.img.naturalHeight, imBoxX + 4, imBoxY + 4, imBoxW - 8, imBoxH - 8);
+      }
+
+      ctx.fillStyle = tc.col;
+      this.fillFittedText(ctx, tc.title, tx + 10, tcY + 118, tcW - 20, 13.5, '800', '"Prompt", sans-serif');
+      ctx.fillStyle = inkMuted;
+      this.fillFittedText(ctx, tc.sub, tx + 10, tcY + 137, tcW - 20, 11.5, '600', '"Prompt", sans-serif');
+      ctx.restore();
+    });
     ctx.restore();
 
-    // 9. BOTTOM STORYLINE PIPELINE PROGRESS BAR
+    // 12. BOTTOM STORYLINE PIPELINE PROGRESS BAR
     const bBarY = cardY + cardH - 52;
-    const bBarX = cardX + 32;
-    const bBarW = cardW - 64;
+    const bBarX = cardX + 28;
+    const bBarW = cardW - 56;
 
     ctx.save();
     ctx.fillStyle = '#0F172A';
@@ -7987,7 +9890,6 @@
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 4 Sequential Stage Pills inside Bottom Bar
     const stages = [
       { num: '01', title: '1. นำเข้าแบบแปลน OTF', phase: 1, color: '#3B82F6' },
       { num: '02', title: '2. Auto BOM & Drawing (≤ 2 นาที)', phase: 2, color: '#10B981' },
@@ -7999,21 +9901,11 @@
     stages.forEach((stg, i) => {
       const spX = bBarX + 16 + i * sPillW;
       const isCur = activePhase === stg.phase;
-
-      if (isCur) {
-        ctx.fillStyle = stg.color;
-        this.roundRect(ctx, spX + 4, bBarY + 5, sPillW - 8, 26, 13);
-        ctx.fill();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '800 12.5px "Prompt", sans-serif';
-      } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        this.roundRect(ctx, spX + 4, bBarY + 5, sPillW - 8, 26, 13);
-        ctx.fill();
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = '600 12px "Prompt", sans-serif';
-      }
-
+      ctx.fillStyle = isCur ? stg.color : 'rgba(255, 255, 255, 0.05)';
+      this.roundRect(ctx, spX + 4, bBarY + 5, sPillW - 8, 26, 13);
+      ctx.fill();
+      ctx.fillStyle = isCur ? '#FFFFFF' : '#94A3B8';
+      ctx.font = isCur ? '800 12.5px "Prompt", sans-serif' : '600 12px "Prompt", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(stg.title, spX + sPillW / 2, bBarY + 22);
       ctx.textAlign = 'left';

@@ -154,7 +154,7 @@ window.PRESENTATION_V3 = true;
     slide('v3-new-workflow', 'New Workflow & Auto BOM Deliverables', 'OTF ➔ SketchUp Auto BOM (≤ 2 Min) ➔ 4 Parallel Branches ➔ Factory Production', 'new-workflow-allinone', [14, 15], {
       sourceImage: 'Pictures/automation_summary_deliverables.jpg',
       videoSrc: '',
-      duration: 140,
+      duration: 150,
       vdoLayout: 'vector-only',
       narration: 'ผังกระบวนการใหม่แบบครบวงจร นำเข้า OTF สู่ 3D SketchUp รัน Auto BOM และถอดปริมาณอัตโนมัติภายใน 2 นาที พร้อมแยกข้อมูล 4 สายงานคู่ขนาน สรุปผลผลิต 5 รายการส่งตรงถึงโรงงานฝ่ายผลิตครับ',
       footerNote: 'NEW FLOW: OTF ➔ SketchUp Auto BOM (≤ 2 Min) ➔ 1. PartItems • 2. Picking/PO • 3. SB List • 4. 2D/3D DWG ➔ Factory Production',
@@ -181,7 +181,7 @@ window.PRESENTATION_V3 = true;
     slide('v3-results', 'RESULT | Auto BOM System Development', 'End-to-End Value Creation from Design to Production & Installation', 'results-full', [15], {
       sourceImage: 'assets/ver3/slide_13_results.jpg',
       duration: 90,
-      metrics:[{value:'7 → 1',label:'วัน / BOM & Drawing',detail:'ลดระยะเวลา [ 7 Days > 1 Day ]'}, {value:'86%',label:'ลดระยะเวลา',detail:'Time Reduction BOM & DWG ประมาณ 86%'}, {value:'1.2M',label:'บาท / ปี',detail:'Cost Reduction: -1,200,000 THB / YEAR'}],
+      metrics:[{value:'7 → 1',label:'วัน / BOM & Drawing',detail:'ลดระยะเวลา [ 7 Days > 1 Day ]'}, {value:'86%',label:'ลดระยะเวลา',detail:'Time Reduction BOM & DWG ประมาณ 86%'}, {value:'1.2M',label:'บาท / ปี',detail:'Cost Reduction: 1.2M THB / YEAR'}],
       nodes:[
         { code: '01', label: 'TIME REDUCTION', sub: '7 Days Before 1 Day After · ลดระยะเวลาจัดทำ BOM และ Drawing ประมาณ 86%' },
         { code: '02', label: 'SKILL & KNOWLEDGE STANDARDIZATION', sub: 'เปลี่ยนองค์ความรู้เฉพาะบุคคลเป็น Logic และมาตรฐานในระบบ ลดการพึ่งพาทักษะการจัดทำ BOM ด้วยมือ' },
@@ -208,7 +208,7 @@ window.PRESENTATION_V3 = true;
   DEFAULT_SLIDES.splice(0, DEFAULT_SLIDES.length, ...intro, ...combinedNewWorkflow, ...processImprovement, ...ending);
   DEFAULT_SLIDES.forEach((s,i) => { s.chapter = `${String(i+1).padStart(2,'0')}  /  ${s.title}`; });
   // Total duration: 897 seconds (14:57 minutes / 14.57 นาที) across 16 slides
-  const timings = [26, 25, 54, 54, 54, 54, 54, 55, 56, 56, 55, 140, 58, 66, 62, 28];
+  const timings = [26, 25, 54, 54, 54, 54, 54, 55, 56, 56, 55, 150, 57, 62, 58, 27];
   const talks = [
     [
       'สวัสดีครับ วันนี้ขอนำเสนอโครงการ Integrated Design และ BOM Automation ครับ แนวคิดหลักคือการเชื่อมโยงงานออกแบบ รายการวัสดุ การผลิต และการติดตั้งเข้าด้วยกัน ผ่านข้อมูลที่สัมพันธ์กันตั้งแต่ต้นทาง โดยเริ่มจากปัญหาของกระบวนการเดิม ไปดูระบบอัตโนมัติ และสรุปผลลัพธ์ครับ',
@@ -311,7 +311,7 @@ window.PRESENTATION_V3 = true;
     ],
     [
       'ผังกระบวนการใหม่ นำเข้าแบบแปลน OTF สู่สามมิติ SketchUp แยกข้อมูลสี่สายงานคู่ขนาน ส่งตรงถึงฝ่ายผลิตครับ เข้าสู่ขั้นตอนที่สอง การทำงานต้นน้ำจากแปลนสถาปัตย์และ P-Rule ครับ ระบบนำเข้าไฟล์สองมิติ CAD เข้าสู่โปรแกรมสามมิติ SketchUp ร่วมกับปลั๊กอิน Ruby เพื่อตรวจสอบเงื่อนไขและขึ้นโมเดลอัตโนมัติครับ สังเกตการทำงานบนหน้าจอครับ ระบบใช้ Logic และ Planning Rule ตรวจจับตำแหน่งผนังภายใน โครงคร่าว แผ่นสมาร์ทบอร์ด ประตู หน้าต่าง และจุดเจาะระบบไฟฟ้าอย่างแม่นยำครับ พร้อมกันนี้ ระบบจะกำหนดรหัสชิ้นส่วน Assembly Code และถอดปริมาณวัสดุ BOQ กับรายการ SKU ออกมาโดยอัตโนมัติ โดยใช้เวลาประมวลผลรวมไม่เกินสองนาทีครับ ข้อมูลที่ประมวลผลเสร็จแล้ว จะถูกแยกออกเป็นสี่สายงานคู่ขนานทันที ทั้งงานสั่งซื้อ PartItems งานเบิกจ่าย Picking List งานเจาะแผ่นสมาร์ทบอร์ด และแบบประกอบสองมิติและสามมิติครับ สรุปผลผลิตหลักทั้งห้ารายการ ได้แก่ โมเดลสามมิติ แบบสองมิติ PartItems, Job Order และ SB List ส่งตรงถึงโรงงานครับ',
-      ['ช่วงที่ 1 (0:00–0:10): ผังภาพรวม New Workflow 4 สายงานคู่ขนาน', 'ช่วงที่ 2 (0:10–2:10): สาธิตต้นน้ำ แปลนสถาปัตย์ & P-Rule บน 3D SketchUp (2 นาที)', 'ช่วงที่ 3 (2:10–2:20): สรุปผลผลิต 5 Deliverables ส่งตรงถึงโรงงานฝ่ายผลิต'],
+      ['ช่วงที่ 1 (0:00–0:10): ผังภาพรวม New Workflow 4 สายงานคู่ขนาน', 'ช่วงที่ 2 (0:10–2:10): สาธิตต้นน้ำ แปลนสถาปัตย์ & P-Rule บน 3D SketchUp (2 นาที)', 'ช่วงที่ 3 (2:10–2:30): สรุปผลผลิต 5 Deliverables ส่งตรงถึงโรงงาน (20 วินาที)'],
       [
         { at: 0.2, text: 'ผังกระบวนการใหม่ นำเข้าแบบแปลน OTF สู่สามมิติ SketchUp แยกข้อมูลสี่สายงานคู่ขนาน ส่งตรงถึงฝ่ายผลิตครับ' },
         { at: 10.3, text: 'เข้าสู่ขั้นตอนที่สอง การทำงานต้นน้ำจากแปลนสถาปัตย์และ P-Rule ครับ ระบบนำเข้าไฟล์สองมิติ CAD เข้าสู่โปรแกรมสามมิติ SketchUp ร่วมกับปลั๊กอิน Ruby เพื่อตรวจสอบเงื่อนไขและขึ้นโมเดลอัตโนมัติครับ' },
