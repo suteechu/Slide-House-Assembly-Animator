@@ -216,7 +216,7 @@ function App() {
                       {s.sourceImage && (
                         <img
                           className="chapter-image"
-                          src={s.sourceImage.startsWith('/') ? s.sourceImage : '/' + s.sourceImage}
+                          src={'./' + s.sourceImage.replace(/^\/+/, '')}
                           alt=""
                           loading="lazy"
                         />
