@@ -8,7 +8,8 @@
 const MAX_TOTAL_SECONDS = 9999; // ปลดล็อกข้อจำกัดเวลา
 
 const AVAILABLE_VIDEOS = [
-  { label: '🎬 [แนะนำ] VDO รัน Plugin QHeim สร้างผนัง & เจาะรูปลั๊ก Auto', src: 'VDO/รัน Plugin.mp4' },
+  { label: '🎬 [1/2] VDO Run IW Plugin (สร้างผนัง & โครง C75 Auto)', src: 'VDO/Run IW Plugin.mp4' },
+  { label: '🎬 [2/2] VDO Run EE Plugin (เจาะจุดปลั๊ก & สวิตช์ Auto)', src: 'VDO/Run EE Plugin.mp4' },
   { label: '🎬 VDO 3D Model Automation (04)', src: 'VDO/3D.mp4' },
   { label: '🎬 VDO 2D Drawing Automation (04)', src: 'VDO/2D.mp4' },
   { label: '🎬 VDO BOM / PartItems Automation (04)', src: 'VDO/BOM.mp4' },
@@ -57,11 +58,15 @@ const DEFAULT_SLIDES = [
     duration: 120,
     sceneType: 'boq-sku-extrusion',
     vdoLayout: 'vdo-with-vector',
-    videoSrc: 'VDO/รัน Plugin.mp4',
+    videoSrc: 'VDO/Run IW Plugin.mp4',
+    videoPlaylist: [
+      { src: 'VDO/Run IW Plugin.mp4', title: 'Run IW Plugin (สร้างผนัง & โครง C75 Auto)', short: 'IW Plugin', fallbackDuration: 39.3 },
+      { src: 'VDO/Run EE Plugin.mp4', title: 'Run EE Plugin (เจาะจุดปลั๊ก & สวิตช์ Auto)', short: 'EE Plugin', fallbackDuration: 34.67 }
+    ],
     videoStart: 0,
     videoRate: 1.0,
     vdoStatus: 'ready',
-    vdoPrompt: '✨ นำเข้า OTF (Forcon.) ➔ รัน Auto BOM & Drawing ใน SketchUp อัตโนมัติ (Fix ไม่เกิน 2 นาที)',
+    vdoPrompt: '🎬 รันปลั๊กอิน SketchUp อัตโนมัติ : Run IW Plugin ➔ Run EE Plugin',
     narration: 'นำข้อมูล โอทีเอฟ เข้า สเก็ตช์อัป ถอดปริมาณชิ้นส่วนและคำนวณตำแหน่งเจาะไฟอัตโนมัติ ภายในเวลาไม่เกินสองนาที พร้อมส่งต่อข้อมูลสี่สายงาน ได้แก่ พาร์ทไอเทมส์ จ๊อบออร์เดอร์ เอสบีลิสต์ และแบบสองมิติสามมิติ',
     footerNote: 'OTF (Forcon.) ➔ Database & Rules ➔ Auto BOM & Drawing (SketchUp ≤ 2 นาที) ➔ 1. PartItems • 2. Job Order • 3. SB List • 4. 2D/3D Drawing',
     nodes: [

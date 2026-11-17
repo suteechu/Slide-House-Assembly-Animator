@@ -160,43 +160,47 @@ function App() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="control flex items-center gap-1.5 py-1 px-2.5" title="ปรับสีพื้นหลังสไลด์ (Slide 10 & 12)">
-            <span className="text-xs font-semibold opacity-80">BG:</span>
-            {[
-              { id: 'default', label: 'Auto', color: 'linear-gradient(135deg,#1e3a31,#72ab99)' },
-              { id: 'washi', label: 'Washi', color: '#f7f5ee' },
-              { id: 'white', label: 'White', color: '#ffffff' },
-              { id: 'sage', label: 'Sage', color: '#dfeee7' },
-              { id: 'emerald-dark', label: 'Dark', color: '#132720' },
-              { id: 'blueprint', label: 'Navy', color: '#10243e' },
-            ].map((p) => (
+          {false && (
+            <>
+              <div className="control flex items-center gap-1.5 py-1 px-2.5" title="ปรับสีพื้นหลังสไลด์ (Slide 10 & 12)">
+                <span className="text-sm font-semibold opacity-80">BG:</span>
+                {[
+                  { id: 'default', label: 'Auto', color: 'linear-gradient(135deg,#1e3a31,#72ab99)' },
+                  { id: 'washi', label: 'Washi', color: '#f7f5ee' },
+                  { id: 'white', label: 'White', color: '#ffffff' },
+                  { id: 'sage', label: 'Sage', color: '#dfeee7' },
+                  { id: 'emerald-dark', label: 'Dark', color: '#132720' },
+                  { id: 'blueprint', label: 'Navy', color: '#10243e' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyBgTheme(p.id, bgColor)}
+                    title={`พื้นหลัง: ${p.label}`}
+                    aria-label={`Background ${p.label}`}
+                    className={`w-5 h-5 rounded-full border transition-transform ${bgPreset === p.id ? 'scale-110 ring-2 ring-emerald-500 border-white' : 'border-slate-400/60 opacity-85 hover:opacity-100'}`}
+                    style={{ background: p.color }}
+                  />
+                ))}
+                <label className="flex items-center gap-1 cursor-pointer ml-0.5" title="เลือกสีพื้นหลังเอง (Custom)">
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => applyBgTheme('custom', e.target.value)}
+                    aria-label="Custom background color"
+                    className={`w-5 h-5 p-0 border-0 rounded cursor-pointer bg-transparent ${bgPreset === 'custom' ? 'ring-2 ring-emerald-500 rounded-full' : ''}`}
+                  />
+                </label>
+              </div>
               <button
-                key={p.id}
-                type="button"
-                onClick={() => applyBgTheme(p.id, bgColor)}
-                title={`พื้นหลัง: ${p.label}`}
-                aria-label={`Background ${p.label}`}
-                className={`w-5 h-5 rounded-full border transition-transform ${bgPreset === p.id ? 'scale-110 ring-2 ring-emerald-500 border-white' : 'border-slate-400/60 opacity-85 hover:opacity-100'}`}
-                style={{ background: p.color }}
-              />
-            ))}
-            <label className="flex items-center gap-1 cursor-pointer ml-0.5" title="เลือกสีพื้นหลังเอง (Custom)">
-              <input
-                type="color"
-                value={bgColor}
-                onChange={(e) => applyBgTheme('custom', e.target.value)}
-                aria-label="Custom background color"
-                className={`w-5 h-5 p-0 border-0 rounded cursor-pointer bg-transparent ${bgPreset === 'custom' ? 'ring-2 ring-emerald-500 rounded-full' : ''}`}
-              />
-            </label>
-          </div>
-          <button
-            className="control"
-            aria-pressed={japanese}
-            onClick={toggleJapanese}
-          >
-            {japanese ? '和 Japanese' : 'Original'}
-          </button>
+                className="control"
+                aria-pressed={japanese}
+                onClick={toggleJapanese}
+              >
+                {japanese ? '和 Japanese' : 'Original'}
+              </button>
+            </>
+          )}
           <button
             className="control"
             onClick={() => setMenu(!menu)}
@@ -209,21 +213,21 @@ function App() {
       <div
         className="shell grid gap-3.5"
         style={{
-          gridTemplateColumns: menu ? '185px minmax(0, 1fr)' : '1fr'
+          gridTemplateColumns: menu ? '220px minmax(0, 1fr)' : '1fr'
         }}
       >
         <AnimatePresence>
           {menu && (
             <motion.aside
               initial={{ opacity: 0, x: -16, width: 0 }}
-              animate={{ opacity: 1, x: 0, width: 185 }}
+              animate={{ opacity: 1, x: 0, width: 220 }}
               exit={{ opacity: 0, x: -16, width: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               className="sidebar panel p-2 flex flex-col min-h-0"
             >
-              <div className="px-2 py-1.5 text-[11px] font-medium tracking-wider text-slate-400 uppercase flex items-center justify-between border-b border-black/5 dark:border-white/5 mb-1.5">
+              <div className="px-2 py-1.5 text-xs font-semibold tracking-wider text-slate-400 uppercase flex items-center justify-between border-b border-black/5 dark:border-white/5 mb-1.5">
                 <span>Chapters</span>
-                <span className="text-[10px] opacity-70 font-mono">
+                <span className="text-xs opacity-75 font-mono">
                   {state.slides.length}
                 </span>
               </div>
@@ -243,14 +247,14 @@ function App() {
                       }`}
                     >
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-[10px] font-mono opacity-60">
+                        <span className="text-xs font-mono opacity-65">
                           {String(i + 1).padStart(2, '0')}
                         </span>
-                        <span className="text-[10px] font-mono opacity-50">
+                        <span className="text-xs font-mono opacity-60">
                           {fmt(s.duration)}
                         </span>
                       </div>
-                      <div className="text-xs leading-snug line-clamp-2 font-medium">
+                      <div className="text-[13.5px] leading-snug line-clamp-2 font-medium">
                         {s.title}
                       </div>
                       {s.sourceImage && (
@@ -293,18 +297,18 @@ function App() {
           </motion.div>
 
           {!app && (
-            <p className="p-2 text-xs text-amber-200">
+            <p className="p-2 text-sm text-amber-200">
               กำลังเริ่มต้นระบบ Native Canvas…
             </p>
           )}
           {error && (
-            <p role="alert" className="p-2 text-xs text-red-300">
+            <p role="alert" className="p-2 text-sm text-red-300">
               {error}
             </p>
           )}
 
           <section className="panel mt-3 p-3.5">
-            <div className="flex justify-between text-xs mb-2">
+            <div className="flex justify-between text-sm mb-2">
               <span className="text-emerald-200">
                 {state.time >= state.total
                   ? 'นำเสนอครบแล้ว'
@@ -329,7 +333,7 @@ function App() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 disabled={!app}
-                className="rounded-lg px-4 py-2 bg-emerald-200 text-emerald-950 font-semibold text-xs transition hover:brightness-105"
+                className="rounded-lg px-4 py-2 bg-emerald-200 text-emerald-950 font-semibold text-sm transition hover:brightness-105"
                 onClick={() => act(a => (a.playAll ? a.playAll() : a.play(true)))}
               >
                 ▶ เล่นทั้งหมดจนจบ
@@ -400,12 +404,12 @@ function App() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="speaker-floating panel p-4 mt-3 overflow-hidden text-xs"
+                className="speaker-floating panel p-4 mt-3 overflow-hidden text-sm"
               >
-                <h2 className="text-emerald-200 font-semibold text-sm mb-2">
+                <h2 className="text-emerald-200 font-semibold text-base mb-2">
                   {slide?.title}
                 </h2>
-                <p className="leading-6 text-slate-300">
+                <p className="leading-relaxed text-slate-300">
                   {slide?.narration}
                 </p>
                 {slide?.speakerCues?.length > 0 && (

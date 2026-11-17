@@ -451,6 +451,17 @@ class PresentationApp {
 
     try { vid.load(); } catch (e) {}
 
+    const triggerPausedRepaint = () => {
+      try {
+        if (!this.isPlaying && typeof this.render === 'function') this.render();
+      } catch (e) {}
+    };
+    if (typeof vid.addEventListener === 'function') {
+      vid.addEventListener('loadeddata', triggerPausedRepaint);
+      vid.addEventListener('canplay', triggerPausedRepaint);
+      vid.addEventListener('seeked', triggerPausedRepaint);
+    }
+
     this.videoCache.set(src, vid);
     return vid;
   }
@@ -3313,8 +3324,8 @@ class PresentationApp {
     // Phase 2 (3.5s - 4.7s): Smooth Shrink to Left Compact Width ("แล้ว ย่อ กลับมาเล็ก เหมือนเดิม")
     // Phase 3 (4.5s - 10.0s): Center VDO Monitor Rises & Powers On (Runs alone without right buttons)
     // Phase 4 (10.0s+): "หลัง VDO" - Right 4 Royal Blue Buttons & Clean Pipes Fade In ("ซ่อนตรงนี้ โชว์ หลังจาก หลัง VOD เลยครับ")
-    const openDuration = 3.5;
-    const shrinkDuration = 1.2;
+    const openDuration = 3.2;
+    const shrinkDuration = 0.8;
 
     let shrinkP = 0;
     if (animSec >= openDuration) {
@@ -3323,8 +3334,8 @@ class PresentationApp {
     }
 
     let vdoEntranceP = 0;
-    if (animSec >= openDuration + 0.8) {
-      const t = Math.min(1.0, (animSec - (openDuration + 0.8)) / 0.7);
+    if (animSec >= openDuration) {
+      const t = Math.min(1.0, (animSec - openDuration) / 0.75);
       vdoEntranceP = t * t * (3 - 2 * t);
     }
 
@@ -3338,9 +3349,9 @@ class PresentationApp {
 
     let activeStep = 0;
     if (animSec < openDuration) activeStep = 0; // 01 OTF Input (Full Screen CAD)
-    else if (animSec < 5.0) activeStep = 1; // 02 Database & Rules (Shrink & VDO Enter)
-    else if (animSec < btnDelay) activeStep = 2; // 03 Auto BOM & Drawing (VDO running, Buttons hidden)
-    else activeStep = 3; // 04 Single Model ("หลัง VDO" - 4 Buttons appeared & active)
+    else if (animSec < 4.0) activeStep = 1; // 02 Database & Rules (Shrink & VDO Enter)
+    else if (animSec < btnDelay) activeStep = 2; // 03 Auto BOM & Drawing (VDO running)
+    else activeStep = 3; // 04 Single Model & Continuous Plugin Demo
 
     // 2. TOP STEP PILLS (4 STEPS ACROSS FULL STAGE WIDTH)
     const topY = box.y + 10;
@@ -3570,11 +3581,11 @@ class PresentationApp {
         const tx = thumbX + thumbS + 10;
         const maxTW = Math.max(80, callW - thumbS - 24);
         ctx.fillStyle = '#C84B31';
-        this.fillFittedText(ctx, `SKU: ${sp.code}`, tx, b.boxY + 26, maxTW, 15, '700', '"JetBrains Mono", monospace');
+        this.fillFittedText(ctx, `SKU: ${sp.code}`, tx, b.boxY + 26, maxTW, 17.5, '700', '"JetBrains Mono", monospace');
         ctx.fillStyle = '#1E293B';
-        this.fillFittedText(ctx, sp.desc, tx, b.boxY + 48, maxTW, 12.5, '600', '"Prompt", sans-serif');
+        this.fillFittedText(ctx, sp.desc, tx, b.boxY + 49, maxTW, 15, '600', '"Prompt", sans-serif');
         ctx.fillStyle = '#2E6F56';
-        this.fillFittedText(ctx, sp.spec, tx, b.boxY + 68, maxTW, 10.5, '700', '"JetBrains Mono", monospace');
+        this.fillFittedText(ctx, sp.spec, tx, b.boxY + 71, maxTW, 13, '700', '"JetBrains Mono", monospace');
       });
       ctx.restore();
     }
@@ -3619,11 +3630,11 @@ class PresentationApp {
         const tx = thX + thS + 10;
         const maxTW = cardW - thS - 24;
         ctx.fillStyle = isCur ? '#C84B31' : '#1B365D';
-        this.fillFittedText(ctx, `SKU: ${sp.code}`, tx, cy + 24, maxTW, 14, '700', '"JetBrains Mono", monospace');
+        this.fillFittedText(ctx, `SKU: ${sp.code}`, tx, cy + 25, maxTW, 17, '700', '"JetBrains Mono", monospace');
         ctx.fillStyle = '#1E293B';
-        this.fillFittedText(ctx, sp.desc, tx, cy + 46, maxTW, 12, '600', '"Prompt", sans-serif');
+        this.fillFittedText(ctx, sp.desc, tx, cy + 48, maxTW, 14.5, '600', '"Prompt", sans-serif');
         ctx.fillStyle = '#2E6F56';
-        this.fillFittedText(ctx, sp.spec, tx, cy + 66, maxTW, 10.5, '700', '"JetBrains Mono", monospace');
+        this.fillFittedText(ctx, sp.spec, tx, cy + 70, maxTW, 13, '700', '"JetBrains Mono", monospace');
 
         // Reticle on 3D Model
         if (isCur) {
@@ -3667,45 +3678,72 @@ class PresentationApp {
     ctx.restore();
     ctx.restore();
 
-    // 5. VIDEO PLAYBACK SYNCHRONIZATION
-    const vdoDelay = 3.5;
+    // 5. VIDEO PLAYBACK SYNCHRONIZATION (Supports sequential playlist: Run IW Plugin ➔ Run EE Plugin)
+    const vdoDelay = 4.0;
     const vdoP = vdoEntranceP;
-    let vid = null;
-    if (slide.videoSrc) {
-      vid = this.getOrCreateVideo(slide.videoSrc);
+    const playlist = (Array.isArray(slide.videoPlaylist) && slide.videoPlaylist.length > 0 && slide.vdoLayout !== 'vector-only')
+      ? slide.videoPlaylist
+      : (slide.videoSrc && slide.vdoLayout !== 'vector-only'
+          ? [{ src: slide.videoSrc, title: slide.vdoPrompt || 'Plugin Video', short: 'Plugin', fallbackDuration: 60 }]
+          : []);
+
+    const clipVids = playlist.map((item) => this.getOrCreateVideo(item.src));
+    const clipDurs = clipVids.map((v, idx) => (v && !isNaN(v.duration) && v.duration > 0) ? v.duration : (playlist[idx].fallbackDuration || 35));
+    const totalPlaylistDur = clipDurs.reduce((acc, d) => acc + d, 0);
+
+    const rate = Math.max(0.25, Math.min(4.0, Number(slide.videoRate) || 1.0));
+    const rawVdoElapsed = (Number(slide.videoStart) || 0) + Math.max(0, animSec - vdoDelay) * rate;
+    const seqElapsed = totalPlaylistDur > 0 ? (rawVdoElapsed % totalPlaylistDur) : 0;
+
+    let activeIdx = 0;
+    let clipStartSec = 0;
+    let localTime = seqElapsed;
+    for (let pi = 0; pi < clipDurs.length; pi++) {
+      if (seqElapsed < clipStartSec + clipDurs[pi] || pi === clipDurs.length - 1) {
+        activeIdx = pi;
+        localTime = Math.max(0, Math.min(clipDurs[pi] - 0.05, seqElapsed - clipStartSec));
+        break;
+      }
+      clipStartSec += clipDurs[pi];
+    }
+
+    const vid = clipVids[activeIdx] || null;
+    if (clipVids.length > 0) {
+      clipVids.forEach((v, idx) => {
+        if (!v) return;
+        if (idx !== activeIdx || animSec < vdoDelay || !this.isPlaying) {
+          if (!v.paused) {
+            try { v.pause(); } catch (e) {}
+          }
+        }
+      });
+
       if (vid) {
-        const rate = Math.max(0.25, Math.min(4.0, Number(slide.videoRate) || 1.0));
         try {
+          vid.loop = clipVids.length === 1;
           vid.playbackRate = rate;
         } catch (e) {
           try { vid.playbackRate = 1.0; } catch (e2) {}
         }
 
-        if (this.isPlaying) {
+        if (animSec >= vdoDelay && this.isPlaying) {
           if (vid.paused) {
-            vid.play().catch(() => {});
+            try { vid.play().catch(() => {}); } catch (e) {}
           }
-          const vdoElapsed = Math.max(0, animSec - vdoDelay) * rate;
-          if (!isNaN(vid.duration) && vid.duration > 0) {
-            const desiredTime = ((Number(slide.videoStart) || 0) + vdoElapsed) % vid.duration;
-            if (Math.abs(vid.currentTime - desiredTime) > 0.45) {
-              vid.currentTime = desiredTime;
-            }
+          if (!isNaN(vid.duration) && vid.duration > 0 && Math.abs(vid.currentTime - localTime) > 0.65) {
+            try { vid.currentTime = localTime; } catch (e) {}
           }
-        } else {
-          if (!vid.paused) vid.pause();
-          if (animSec >= vdoDelay && !isNaN(vid.duration) && vid.duration > 0) {
-            const vdoElapsed = (animSec - vdoDelay) * rate;
-            const desiredTime = ((Number(slide.videoStart) || 0) + vdoElapsed) % vid.duration;
-            if (Math.abs(vid.currentTime - desiredTime) > 0.45) {
-              vid.currentTime = desiredTime;
-            }
+        } else if (animSec >= vdoDelay && vid.readyState >= 1) {
+          if (!isNaN(vid.duration) && vid.duration > 0 && Math.abs(vid.currentTime - localTime) > 0.2) {
+            try { vid.currentTime = localTime; } catch (e) {}
           }
         }
       }
     }
 
     // 6. DRAW RIGHT VDO MONITOR ("เล่นไปสักพัก ให้ จอ รัน VDO ให้ขึ้น")
+    this._step2VdoClipHits = [];
+    this.vdoMonitorRect = null;
     if (vdoP > 0.001 && vdoW > 100) {
       ctx.save();
       const yRiseOffset = (1 - vdoP) * 140;
@@ -3719,43 +3757,94 @@ class PresentationApp {
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Top Monitor Header (Height 48px)
-      const topH = 48;
+      // Top Monitor Header (Height 50px)
+      const topH = 50;
       ctx.fillStyle = '#1E293B';
       this.roundRect(ctx, vdoX, vdoY + yRiseOffset, vdoW, topH, 12);
       ctx.fill();
 
       // Live Pulse Dot
       const redDotPulse = 0.5 + 0.5 * Math.sin(nowSec * 6);
-      const isPureVector = (slide.vdoLayout === 'vector-only' || !slide.videoSrc);
+      const isPureVector = (slide.vdoLayout === 'vector-only' || playlist.length === 0);
       ctx.fillStyle = isPureVector ? `rgba(16, 185, 129, ${0.7 + 0.3 * redDotPulse})` : `rgba(239, 68, 68, ${0.7 + 0.3 * redDotPulse})`;
       ctx.beginPath();
-      ctx.arc(vdoX + 26, vdoY + yRiseOffset + 24, 6.5, 0, Math.PI * 2);
+      ctx.arc(vdoX + 26, vdoY + yRiseOffset + 25, 6.5, 0, Math.PI * 2);
       ctx.fill();
+
+      // Clickable Header Pills for Sequential Playlist (Run IW Plugin ➔ Run EE Plugin)
+      let pillsRightBound = vdoX + vdoW - 180;
+      if (playlist.length > 1) {
+        const chipW = 192;
+        const chipGap = 10;
+        const badgeReserve = 166;
+        const totalChipsW = playlist.length * chipW + (playlist.length - 1) * chipGap;
+        let chipX = vdoX + vdoW - badgeReserve - totalChipsW - 14;
+        pillsRightBound = chipX - 16;
+
+        let accStart = 0;
+        playlist.forEach((item, idx) => {
+          const isCurClip = idx === activeIdx;
+          const chipY = vdoY + yRiseOffset + 10;
+          const chipH = 30;
+          const pillCol = idx === 0 ? '#10B981' : '#F59E0B';
+          ctx.fillStyle = isCurClip ? pillCol : 'rgba(255, 255, 255, 0.08)';
+          this.roundRect(ctx, chipX, chipY, chipW, chipH, 15);
+          ctx.fill();
+          ctx.strokeStyle = isCurClip ? pillCol : 'rgba(255, 255, 255, 0.22)';
+          ctx.lineWidth = isCurClip ? 1.5 : 1;
+          ctx.stroke();
+
+          ctx.fillStyle = isCurClip ? '#0F172A' : '#CBD5E1';
+          const chipLabel = `${idx + 1} · ${item.short || item.title} (${this.formatTime(clipDurs[idx])})`;
+          this.fillFittedText(ctx, chipLabel, chipX + chipW / 2, chipY + 20, chipW - 16, 13.5, '800', '"Prompt", sans-serif', 'center');
+
+          this._step2VdoClipHits.push({
+            x: chipX, y: chipY, w: chipW, h: chipH,
+            clipIdx: idx, clipStartSec: accStart, stepDelaySec: vdoDelay
+          });
+          accStart += clipDurs[idx];
+          chipX += chipW + chipGap;
+        });
+      }
 
       // Monitor Title
       ctx.fillStyle = '#FFFFFF';
+      const activeClipTitle = playlist[activeIdx] ? `VDO ${activeIdx + 1}/${playlist.length} · ${playlist[activeIdx].title}` : '';
       const vdoTitle = isPureVector
         ? (slide.vdoPrompt || '✨ SketchUp Live Studio: รัน Auto BOM & Extrusion 3D อัตโนมัติ (Fix ≤ 2 นาที)')
-        : (slide.vdoPrompt || '🎬 VDO รัน Plugin QHeim สร้างผนัง & เจาะรูปลั๊ก Auto จริง');
-      this.fillFittedText(ctx, vdoTitle, vdoX + 44, vdoY + yRiseOffset + 30, vdoW - 220, 15, '700', '"Prompt", sans-serif');
+        : (activeClipTitle || slide.vdoPrompt || '🎬 VDO รัน Plugin SketchUp Auto จริง');
+      this.fillFittedText(ctx, vdoTitle, vdoX + 44, vdoY + yRiseOffset + 31, Math.max(180, pillsRightBound - (vdoX + 44)), 17.5, '700', '"Prompt", sans-serif');
 
       // Right Live Badge
       ctx.fillStyle = isPureVector ? '#059669' : '#22C55E';
-      this.roundRect(ctx, vdoX + vdoW - 150, vdoY + yRiseOffset + 12, 136, 24, 6);
+      this.roundRect(ctx, vdoX + vdoW - 166, vdoY + yRiseOffset + 12, 152, 26, 6);
       ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      this.fillFittedText(ctx, isPureVector ? '● AUTO SIMULATION' : '● LIVE RECORDING', vdoX + vdoW - 82, vdoY + yRiseOffset + 28, 126, 11, '800', '"JetBrains Mono", monospace', 'center');
+      this.fillFittedText(ctx, isPureVector ? '● AUTO SIMULATION' : '● LIVE RECORDING', vdoX + vdoW - 90, vdoY + yRiseOffset + 30, 142, 13, '800', '"JetBrains Mono", monospace', 'center');
 
       // Video Viewport (Clipped)
       const vidBoxX = vdoX + 6;
       const vidBoxY = vdoY + yRiseOffset + topH + 4;
       const vidBoxW = vdoW - 12;
       const vidBoxH = vdoH - topH - 10;
+      const hudBarH = 42;
+      const vidFrameH = Math.max(100, vidBoxH - hudBarH);
 
       ctx.save();
       this.roundRect(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH, 10);
       ctx.clip();
+
+      const codeColW = Math.min(436, Math.max(388, Math.floor(vidBoxW * 0.32)));
+      const codeWindowSec = 10.0;
+      const codeWipeSec = 0.75;
+      const codeExpandP = (!isPureVector && playlist.length > 0)
+        ? this.easeOutCubic(Math.min(1, Math.max(0, (seqElapsed - codeWindowSec) / codeWipeSec)))
+        : 0;
+      const baseVidW = Math.max(420, vidBoxW - codeColW - 22);
+      const vidFrameW = Math.round(baseVidW + (vidBoxW - baseVidW) * codeExpandP);
+
+      ctx.fillStyle = '#090F1E';
+      ctx.fillRect(vidBoxX, vidBoxY, vidBoxW, vidFrameH);
 
       const canDrawVideo = !isPureVector && vid && (
         vid.readyState >= 2 ||
@@ -3764,46 +3853,98 @@ class PresentationApp {
       );
 
       if (canDrawVideo) {
-        if (this.isPlaying && vid.paused) vid.play().catch(() => {});
-        else if (!this.isPlaying && !vid.paused) vid.pause();
-        vid.loop = true;
-        this.drawMediaContain(ctx, vid, vid.videoWidth || 1920, vid.videoHeight || 1080, vidBoxX, vidBoxY, vidBoxW, vidBoxH);
+        this.drawMediaContain(ctx, vid, vid.videoWidth || 1280, vid.videoHeight || 720, vidBoxX + 4, vidBoxY + 4, vidFrameW - 8, vidFrameH - 8);
+      } else if (!isPureVector) {
+        // Loading indicator while real MP4 initializes/buffers
+        ctx.fillStyle = '#94A3B8';
+        this.fillFittedText(ctx, `⏳ กำลังเตรียมวิดีโอ ${playlist[activeIdx] ? playlist[activeIdx].title : ''}...`, vidBoxX + vidFrameW / 2, vidBoxY + vidFrameH / 2, vidFrameW - 48, 20, '700', '"Prompt", sans-serif', 'center');
       } else {
-        // Pure Procedural Vector Animation ("ไม่ต้องคลิป เป็น อินนิเมชั้นได้เลย")
-        this.drawSketchUpLiveSimulationStudio(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH, animSec, nowSec);
+        // Pure Procedural Vector Fallback
+        this.drawSketchUpLiveSimulationStudio(ctx, vidBoxX, vidBoxY, vidFrameW, vidFrameH, animSec, nowSec);
       }
 
-      // Bottom Video HUD Scrubber & Timecode (Default 120s = 02:00 max timeline; Code streams 00:02 -> 01:55)
-      const hudBarH = 34;
-      const rawVdoSec = (vid && !isNaN(vid.duration) && vid.duration > 0) ? vid.duration : 120;
-      const vdoTotalSec = Math.min(120, rawVdoSec);
-      const currentVdoTime = (vid && !isNaN(vid.currentTime) && vid.currentTime > 0) ? vid.currentTime : Math.max(0, animSec - vdoDelay);
-      const vdoElapsed = Math.min(vdoTotalSec, currentVdoTime);
+      // Run Clean White 30X Ruby Code Console for 10.0s, then fade & hand full monitor width to the VDO
+      if (codeExpandP < 0.995) {
+        ctx.save();
+        ctx.globalAlpha *= (1 - codeExpandP);
+        const isStreamActive = this.isPlaying && (!vid || !vid.paused);
+        this.drawLiveCodeTerminalStreamer(ctx, vidBoxX + Math.round(codeExpandP * 56), vidBoxY, vidBoxW, vidFrameH, seqElapsed, codeWindowSec, nowSec, isStreamActive);
+        ctx.restore();
+      }
 
-      // Save VDO monitor hit rect for direct click-to-play on Slide 03
+      // Save VDO monitor screen hit rect (below header tabs, inside video area) for direct click-to-play
       this.vdoMonitorRect = { x: vidBoxX, y: vidBoxY, w: vidBoxW, h: vidBoxH };
 
-      // 6.1 UNIFIED RIGHT 20X CODE CONSOLE HUD (Left overlay removed; Right Console runs 00:02 -> 01:55 at 20X)
-      const isStreamActive = this.isPlaying && (!vid || !vid.paused);
-      this.drawLiveCodeTerminalStreamer(ctx, vidBoxX, vidBoxY, vidBoxW, vidBoxH - hudBarH, vdoElapsed, vdoTotalSec, nowSec, isStreamActive);
-
+      // Bottom Dual-Segment Video HUD Scrubber & Sequence Readout
       const hudBarY = vidBoxY + vidBoxH - hudBarH;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
       ctx.fillRect(vidBoxX, hudBarY, vidBoxW, hudBarH);
 
-      const curVdoStr = this.formatTime(vdoElapsed);
-      const totVdoStr = this.formatTime(vdoTotalSec);
+      const curLocalStr = this.formatTime(localTime);
+      const curClipTotStr = this.formatTime(clipDurs[activeIdx] || 0);
+      const seqCurStr = this.formatTime(seqElapsed);
+      const seqTotStr = this.formatTime(totalPlaylistDur || 120);
+      const nextHint = (playlist.length > 1 && activeIdx === 0) ? `  •  ถัดไป: ${playlist[1].short}` : (playlist.length > 1 ? '  •  ครบชุด 2 ปลั๊กอิน' : '');
 
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = '600 13px "Prompt", sans-serif';
-      ctx.fillText(`⚡ รันปลั๊กอินอัตโนมัติ: ${curVdoStr} / ${totVdoStr} • QHeim 20X Engine (รันโค้ด 00:02 – 01:55)`, vidBoxX + 16, hudBarY + 22);
+      ctx.fillStyle = '#F8FAFC';
+      this.fillFittedText(
+        ctx,
+        `▶ ${playlist[activeIdx] ? playlist[activeIdx].title : 'Plugin Demo'} (${curLocalStr} / ${curClipTotStr})  •  รวม ${seqCurStr} / ${seqTotStr}${nextHint}`,
+        vidBoxX + 16,
+        hudBarY + 21,
+        vidBoxW - 220,
+        15,
+        '700',
+        '"Prompt", sans-serif'
+      );
 
-      // Progress Line Bar running smoothly along with video
-      const progP = (vdoTotalSec > 0) ? Math.min(1.0, vdoElapsed / vdoTotalSec) : 0;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(vidBoxX + 16, hudBarY + 28, vidBoxW - 32, 3);
-      ctx.fillStyle = '#22C55E';
-      ctx.fillRect(vidBoxX + 16, hudBarY + 28, (vidBoxW - 32) * progP, 3);
+      ctx.fillStyle = '#94A3B8';
+      this.fillFittedText(
+        ctx,
+        this.isPlaying ? 'คลิกหน้าจอเพื่อหยุดชั่วคราว' : 'คลิกหน้าจอเพื่อเล่นวิดีโอ',
+        vidBoxX + vidBoxW - 16,
+        hudBarY + 21,
+        190,
+        13.5,
+        '600',
+        '"Prompt", sans-serif',
+        'right'
+      );
+
+      // Segmented Progress Line Track (Shows Clip 1 -> Clip 2 split clearly)
+      const barX = vidBoxX + 16;
+      const barW = vidBoxW - 32;
+      const barY = hudBarY + 31;
+      const barH = 5;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.fillRect(barX, barY, barW, barH);
+
+      if (playlist.length > 1 && totalPlaylistDur > 0) {
+        let segAcc = 0;
+        let xCursor = barX;
+        playlist.forEach((_, si) => {
+          const segW = Math.max(4, barW * (clipDurs[si] / totalPlaylistDur) - (si < playlist.length - 1 ? 3 : 0));
+          const segCol = si === 0 ? '#10B981' : '#F59E0B';
+          let fillFrac = 0;
+          if (seqElapsed >= segAcc + clipDurs[si]) fillFrac = 1;
+          else if (seqElapsed > segAcc) fillFrac = (seqElapsed - segAcc) / (clipDurs[si] || 1);
+          if (fillFrac > 0) {
+            ctx.fillStyle = segCol;
+            ctx.fillRect(xCursor, barY, segW * fillFrac, barH);
+          }
+          // Divider tick at boundary
+          if (si < playlist.length - 1) {
+            ctx.fillStyle = '#0F172A';
+            ctx.fillRect(xCursor + segW, barY - 1, 3, barH + 2);
+          }
+          segAcc += clipDurs[si];
+          xCursor += segW + 3;
+        });
+      } else {
+        const progP = (totalPlaylistDur > 0) ? Math.min(1.0, seqElapsed / totalPlaylistDur) : 0;
+        ctx.fillStyle = '#22C55E';
+        ctx.fillRect(barX, barY, barW * progP, barH);
+      }
 
       ctx.restore();
       ctx.restore();
@@ -3821,17 +3962,18 @@ class PresentationApp {
     ctx.restore();
   }
 
-  // ==================== RIGHT LIVE 20X RUBY CODE CONSOLE STREAMER (00:02 -> 01:55) ====================
+  // ==================== RIGHT LIVE 30X CLEAN WHITE RUBY CODE CONSOLE STREAMER ====================
   drawLiveCodeTerminalStreamer(ctx, x, y, maxW, maxH, vdoElapsed, vdoTotalSec, nowSec, isRunning = true) {
-    const codeW = Math.min(448, Math.max(388, Math.floor(maxW * 0.34)));
-    const codeH = Math.max(200, maxH - 24);
-    const termX = x + maxW - codeW - 14;
-    const termY = y + 12;
+    const codeW = Math.min(436, Math.max(388, Math.floor(maxW * 0.32)));
+    const codeH = Math.max(200, maxH - 20);
+    const termX = x + maxW - codeW - 10;
+    const termY = y + 10;
 
-    const startSec = 2.0;
-    const endSec = 115.0; // 1 minute 55 seconds
-    const runWindow = endSec - startSec; // 113.0s
-    const speedMultiplier = 20.0;
+    const startSec = 0.0;
+    const endSec = (vdoTotalSec > 0 && vdoTotalSec <= 15.0) ? vdoTotalSec : 10.0;
+    const runWindow = Math.max(1.0, endSec - startSec);
+    const speedMultiplier = 30.0;
+    const endTimeStr = this.formatTime(endSec);
 
     const phase = vdoElapsed < startSec ? 'waiting' : (vdoElapsed >= endSec ? 'done' : 'running');
     const clampedRunElapsed = Math.min(runWindow, Math.max(0, vdoElapsed - startSec));
@@ -3839,23 +3981,30 @@ class PresentationApp {
 
     ctx.save();
 
-    // 1. Rounded Dark Console Backdrop + Cyan/Emerald Accent Border
-    ctx.fillStyle = 'rgba(10, 15, 29, 0.94)';
+    // 1. Clean White Console Backdrop + Subtle Emerald/Slate Accent Border
+    ctx.fillStyle = '#FFFFFF';
     this.roundRect(ctx, termX, termY, codeW, codeH, 10);
     ctx.fill();
-    ctx.strokeStyle = phase === 'running' ? 'rgba(16, 185, 129, 0.72)' : 'rgba(56, 189, 248, 0.55)';
+    ctx.strokeStyle = phase === 'running' ? '#10B981' : '#CBD5E1';
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // 2. Terminal Header Bar (Height: 36px)
+    // 2. Terminal Header Bar (Clean White/Slate Top Chrome, Height: 36px)
     const headH = 36;
     ctx.save();
     ctx.beginPath();
     if (typeof ctx.roundRect === 'function') ctx.roundRect(termX, termY, codeW, headH, [10, 10, 0, 0]);
     else ctx.rect(termX, termY, codeW, headH);
-    ctx.fillStyle = '#1E293B';
+    ctx.fillStyle = '#F8FAFC';
     ctx.fill();
     ctx.restore();
+
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(termX, termY + headH);
+    ctx.lineTo(termX + codeW, termY + headH);
+    ctx.stroke();
 
     // 3 Mac-style window dots
     const dotY = termY + 18;
@@ -3871,60 +4020,63 @@ class PresentationApp {
     });
 
     // Console Title (fitted cleanly clear of top-right status badge)
-    ctx.fillStyle = '#F8FAFC';
-    this.fillFittedText(ctx, 'Ruby Engine · QHeim_AutoBOM.rb', termX + 58, termY + 22, Math.max(80, codeW - 186), 11.8, '700', '"JetBrains Mono", monospace');
+    ctx.fillStyle = '#0F172A';
+    this.fillFittedText(ctx, 'Ruby Engine · QHeim_AutoBOM.rb', termX + 56, termY + 23, Math.max(80, codeW - 196), 13.5, '800', '"JetBrains Mono", monospace');
 
-    // Top-Right Status Badge: WAIT 00:02 / RUNNING 20X / DONE 01:55
-    const badgeW = 108;
-    const badgeH = 20;
+    // Top-Right Status Badge: WAIT 00:02 / RUNNING 30X / DONE
+    const badgeW = 124;
+    const badgeH = 22;
     const badgeX = termX + codeW - badgeW - 10;
-    const badgeY = termY + 8;
+    const badgeY = termY + 7;
 
     const badgeFill = phase === 'running'
-      ? 'rgba(34, 197, 94, 0.24)'
-      : (phase === 'done' ? 'rgba(16, 185, 129, 0.28)' : 'rgba(245, 158, 11, 0.22)');
+      ? '#ECFDF5'
+      : (phase === 'done' ? '#D1FAE5' : '#FEF3C7');
     ctx.fillStyle = badgeFill;
     this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 5);
     ctx.fill();
+    ctx.strokeStyle = phase === 'waiting' ? '#F59E0B88' : '#10B98188';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-    const dotPulse = phase === 'running' ? (0.5 + 0.5 * Math.sin(nowSec * 10)) : 1.0;
+    const dotPulse = phase === 'running' ? (0.45 + 0.55 * Math.sin(nowSec * 14)) : 1.0;
     ctx.fillStyle = phase === 'waiting'
-      ? '#F59E0B'
-      : `rgba(52, 211, 153, ${dotPulse})`;
+      ? '#D97706'
+      : `rgba(5, 150, 105, ${dotPulse})`;
     ctx.beginPath();
     ctx.arc(badgeX + 10, badgeY + badgeH / 2, 3.2, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = phase === 'waiting' ? '#FDE68A' : '#86EFAC';
-    ctx.font = '800 10px "JetBrains Mono", monospace';
-    const statusLabel = phase === 'waiting' ? 'WAIT 00:02' : (phase === 'done' ? 'DONE 01:55' : 'RUNNING 20X');
-    ctx.fillText(statusLabel, badgeX + 19, badgeY + 13.5);
+    ctx.fillStyle = phase === 'waiting' ? '#B45309' : '#047857';
+    ctx.font = '800 12px "JetBrains Mono", monospace';
+    const statusLabel = phase === 'waiting' ? 'WAIT 00:02' : (phase === 'done' ? `DONE ${endTimeStr}` : 'RUNNING 30X');
+    ctx.fillText(statusLabel, badgeX + 18, badgeY + 15);
 
     // 2.5 Telemetry Sub-Bar (Batch counter & Run Window)
     const subBarY = termY + headH;
     const subBarH = 24;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
+    ctx.fillStyle = '#F1F5F9';
     ctx.fillRect(termX + 1, subBarY, codeW - 2, subBarH);
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)';
+    ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(termX, subBarY + subBarH);
     ctx.lineTo(termX + codeW, subBarY + subBarH);
     ctx.stroke();
 
-    const passNum = phase === 'waiting' ? 0 : (phase === 'done' ? 20 : Math.min(20, Math.floor(windowProg * 20) + 1));
-    ctx.fillStyle = '#38BDF8';
-    ctx.font = '700 10px "JetBrains Mono", monospace';
-    ctx.fillText(`> ruby QHeim_AutoBOM.rb --20x  [Pass ${String(passNum).padStart(2, '0')}/20]`, termX + 12, subBarY + 15);
+    const passNum = phase === 'waiting' ? 0 : (phase === 'done' ? 30 : Math.min(30, Math.floor(windowProg * 30) + 1));
+    ctx.fillStyle = '#0369A1';
+    this.fillFittedText(ctx, `> ruby QHeim_AutoBOM.rb --30x  [Pass ${String(passNum).padStart(2, '0')}/30]`, termX + 10, subBarY + 16, codeW - 122, 11.5, '700', '"JetBrains Mono", monospace');
 
-    ctx.fillStyle = phase === 'done' ? '#34D399' : '#94A3B8';
+    ctx.fillStyle = phase === 'done' ? '#047857' : '#475569';
+    ctx.font = '700 11.5px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(`${this.formatTime(Math.min(endSec, Math.max(0, vdoElapsed)))} / 01:55`, termX + codeW - 12, subBarY + 15);
+    ctx.fillText(`${this.formatTime(Math.min(endSec, Math.max(0, vdoElapsed)))} / ${endTimeStr}`, termX + codeW - 10, subBarY + 16);
     ctx.textAlign = 'left';
 
     // 3. Rich SketchUp Ruby Plugin + Engine Output Code Stream
     const scriptLines = [
-      { type: 'comment', text: '# QHeim_AutoBOM Engine v3.2 (20X Pipeline)' },
+      { type: 'comment', text: '# QHeim_AutoBOM Engine v3.2 (30X Pipeline)' },
       { type: 'keyword', text: 'require "sketchup.rb" ; require "json"' },
       { type: 'keyword', text: 'module SCGHeim::AutoBOM_Runner' },
       { type: 'comment', text: '# [STAGE 1] Parse OTF CAD & P-Rules' },
@@ -3964,16 +4116,15 @@ class PresentationApp {
     ];
 
     const totalLines = scriptLines.length;
-    // Run 20 full passes over 113s window (00:02 -> 01:55): 5.65s per full pass (~6.5 lines/sec -> crisp 20X live feel)
-    const cycleDuration = runWindow / speedMultiplier;
+    // Ultra-fast 10-second 30X run: ~1.0s per full 37-line pass (~10 passes across 10.0s window)
+    const cycleDuration = Math.max(0.85, Math.min(1.5, runWindow / 10.0));
     let activeLineFloat = 0;
     if (phase === 'waiting') {
       activeLineFloat = 0;
     } else if (phase === 'done') {
       activeLineFloat = totalLines - 1;
     } else {
-      const liveClock = isRunning ? clampedRunElapsed : (clampedRunElapsed + nowSec);
-      const cycleProg = (liveClock % cycleDuration) / cycleDuration;
+      const cycleProg = (clampedRunElapsed % cycleDuration) / cycleDuration;
       activeLineFloat = cycleProg * totalLines;
     }
     const activeLineIdx = Math.min(totalLines - 1, Math.floor(activeLineFloat));
@@ -3992,7 +4143,7 @@ class PresentationApp {
     ctx.rect(termX + 1, contentY, codeW - 2, contentH);
     ctx.clip();
 
-    const cursorBlink = Math.sin(nowSec * 9) > 0;
+    const cursorBlink = Math.sin(nowSec * 14) > 0;
 
     scriptLines.forEach((item, idx) => {
       const ly = contentY + idx * lineH - scrollY;
@@ -4001,23 +4152,23 @@ class PresentationApp {
       const isActive = idx === activeLineIdx;
 
       if (isActive) {
-        ctx.fillStyle = phase === 'done' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(56, 189, 248, 0.20)';
+        ctx.fillStyle = phase === 'done' ? 'rgba(16, 185, 129, 0.14)' : 'rgba(2, 132, 199, 0.10)';
         ctx.fillRect(termX + 2, ly - 1, codeW - 4, lineH);
 
-        ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
-        ctx.font = '700 10.5px "JetBrains Mono", monospace';
-        ctx.fillText('▶', termX + 6, ly + 14);
+        ctx.fillStyle = phase === 'done' ? '#059669' : '#0284C7';
+        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.fillText('▶', termX + 5, ly + 14.5);
       }
 
       // Line number
-      ctx.fillStyle = isActive ? '#E2E8F0' : '#475569';
-      ctx.font = '500 10.5px "JetBrains Mono", monospace';
+      ctx.fillStyle = isActive ? '#0F172A' : '#94A3B8';
+      ctx.font = isActive ? '700 12px "JetBrains Mono", monospace' : '500 12px "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(String(idx + 1).padStart(2, '0'), termX + 34, ly + 14);
+      ctx.fillText(String(idx + 1).padStart(2, '0'), termX + 35, ly + 14.5);
       ctx.textAlign = 'left';
 
       // Gutter divider
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.55)';
+      ctx.strokeStyle = '#E2E8F0';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(termX + 40, ly);
@@ -4029,36 +4180,36 @@ class PresentationApp {
       if (item.type === 'comment') {
         ctx.fillStyle = '#64748B';
       } else if (item.type === 'keyword') {
-        ctx.fillStyle = '#FB7185';
+        ctx.fillStyle = '#BE123C';
       } else if (item.type === 'log') {
-        ctx.fillStyle = item.text.includes('DONE') ? '#34D399' : '#FBBF24';
+        ctx.fillStyle = item.text.includes('DONE') ? '#047857' : '#B45309';
       } else {
-        ctx.fillStyle = isActive ? '#38BDF8' : '#E2E8F0';
+        ctx.fillStyle = isActive ? '#0369A1' : '#1E293B';
       }
 
-      this.fillFittedText(ctx, item.text, tx, ly + 14, maxTextW, 11.2, item.type === 'log' ? '700' : '500', '"JetBrains Mono", monospace');
+      this.fillFittedText(ctx, item.text, tx, ly + 15, maxTextW, 13, item.type === 'log' ? '700' : '500', '"JetBrains Mono", monospace');
 
       if (isActive && cursorBlink) {
-        ctx.font = `${item.type === 'log' ? '700' : '500'} 11.2px "JetBrains Mono", monospace`;
+        ctx.font = `${item.type === 'log' ? '700' : '500'} 13px "JetBrains Mono", monospace`;
         const measured = Math.min(maxTextW, ctx.measureText(item.text).width);
-        ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
-        ctx.fillRect(tx + measured + 3, ly + 3, 6, 13);
+        ctx.fillStyle = phase === 'done' ? '#059669' : '#0284C7';
+        ctx.fillRect(tx + measured + 3, ly + 3, 6, 14);
       }
     });
 
     ctx.restore();
 
-    // 4. Console Bottom Status & Progress Bar (0% @ 00:02 -> 100% @ 01:55)
+    // 4. Console Bottom Status & Progress Bar (Clean White/Slate Footer)
     const footY = termY + codeH - footerH;
     ctx.save();
     ctx.beginPath();
     if (typeof ctx.roundRect === 'function') ctx.roundRect(termX, footY, codeW, footerH, [0, 0, 10, 10]);
     else ctx.rect(termX, footY, codeW, footerH);
-    ctx.fillStyle = '#0F172A';
+    ctx.fillStyle = '#F8FAFC';
     ctx.fill();
     ctx.restore();
 
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)';
+    ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(termX, footY);
@@ -4066,25 +4217,24 @@ class PresentationApp {
     ctx.stroke();
 
     const pctInt = Math.round(windowProg * 100);
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '600 10px "JetBrains Mono", monospace';
-    ctx.fillText(`Ln ${activeLineIdx + 1}/${totalLines} · Ruby 20X · Run: 00:02 → 01:55`, termX + 12, footY + 14);
+    ctx.fillStyle = '#475569';
+    this.fillFittedText(ctx, `Ln ${activeLineIdx + 1}/${totalLines} · Ruby 30X · Run: 00:00 → ${endTimeStr}`, termX + 12, footY + 15, codeW - 72, 12, '600', '"JetBrains Mono", monospace');
 
-    ctx.fillStyle = phase === 'done' ? '#34D399' : '#38BDF8';
-    ctx.font = '800 10.5px "JetBrains Mono", monospace';
+    ctx.fillStyle = phase === 'done' ? '#047857' : '#0284C7';
+    ctx.font = '800 12.5px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(`${pctInt}%`, termX + codeW - 12, footY + 14);
+    ctx.fillText(`${pctInt}%`, termX + codeW - 12, footY + 15);
     ctx.textAlign = 'left';
 
     // Smooth Execution Progress Meter
     const barW = codeW - 24;
-    ctx.fillStyle = '#1E293B';
+    ctx.fillStyle = '#E2E8F0';
     this.roundRect(ctx, termX + 12, footY + 21, barW, 9, 4.5);
     ctx.fill();
     if (windowProg > 0.005) {
       const pGrad = ctx.createLinearGradient(termX + 12, 0, termX + 12 + barW, 0);
       pGrad.addColorStop(0, '#0284C7');
-      pGrad.addColorStop(1, '#10B981');
+      pGrad.addColorStop(1, '#059669');
       ctx.fillStyle = pGrad;
       this.roundRect(ctx, termX + 12, footY + 21, barW * windowProg, 9, 4.5);
       ctx.fill();
@@ -4355,7 +4505,7 @@ class PresentationApp {
     ctx.fill();
 
     ctx.fillStyle = '#86EFAC';
-    this.fillFittedText(ctx, '● 5-STREAM REALTIME SYNC', bX + bW / 2 + 8, headY + 28, bW - 40, 12, '800', '"JetBrains Mono", monospace', 'center');
+    this.fillFittedText(ctx, '● 5-STREAM REALTIME SYNC', bX + bW / 2 + 8, headY + 29, bW - 36, 14.5, '800', '"JetBrains Mono", monospace', 'center');
     ctx.restore();
 
     // 2. 5 DELIVERABLES CARDS EXPANDED TO FULL SCREEN HEIGHT ("ส่วนอื่นจัดให้เต็มจอ")
@@ -4394,20 +4544,20 @@ class PresentationApp {
       // 2.1 Card Top Header
       // Sequence Tag & Code Pill
       ctx.fillStyle = isAct ? '#EA580C' : '#0F172A';
-      this.roundRect(ctx, cx + 16, cy + 18, 92, 24, 6);
+      this.roundRect(ctx, cx + 16, cy + 16, 108, 28, 7);
       ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      this.fillFittedText(ctx, 'OUTPUT 0' + (idx + 1), cx + 62, cy + 34, 80, 11, '800', '"JetBrains Mono", monospace', 'center');
+      this.fillFittedText(ctx, 'OUTPUT 0' + (idx + 1), cx + 70, cy + 35, 96, 13.5, '800', '"JetBrains Mono", monospace', 'center');
 
       ctx.fillStyle = isAct ? '#EA580C' : '#C84B31';
-      this.fillFittedText(ctx, item.code, cx + cardW - 32, cy + 34, 40, 14, '800', '"Prompt", sans-serif', 'center');
+      this.fillFittedText(ctx, item.code, cx + cardW - 36, cy + 35, 52, 16.5, '800', '"Prompt", sans-serif', 'center');
 
       // Title & Subtitle
       ctx.fillStyle = '#0F172A';
       this.fillFittedText(ctx, item.label, cx + 16, cy + 72, cardW - 32, 23, '800', '"Prompt", sans-serif');
 
       ctx.fillStyle = '#64748B';
-      this.fillFittedText(ctx, item.sub, cx + 16, cy + 96, cardW - 32, 13.5, '600', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, item.sub, cx + 16, cy + 98, cardW - 32, 16, '600', '"Prompt", sans-serif');
 
       // 2.2 UPPER VIDEO EMBED ("ในกล่องให้เป็น VDO ที่แนบ")
       const vBoxX = cx + 14;
@@ -4459,10 +4609,10 @@ class PresentationApp {
       // Live Video Overlay Badge (shows playing timecode or buffering state)
       const isLiveReady = vid && ((vid.readyState >= 2) || (vid.videoWidth > 0 && vid.currentTime > 0));
       ctx.fillStyle = isAct ? 'rgba(234, 88, 12, 0.92)' : (isLiveReady ? 'rgba(5, 150, 105, 0.90)' : 'rgba(15, 23, 42, 0.82)');
-      this.roundRect(ctx, vBoxX + 10, vBoxY + 10, 86, 24, 6);
+      this.roundRect(ctx, vBoxX + 10, vBoxY + 10, 104, 26, 6);
       ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      this.fillFittedText(ctx, isAct ? '● FOCUS' : (isLiveReady ? '▶ LIVE VDO' : '⏳ BUFFER'), vBoxX + 53, vBoxY + 26, 76, 10.5, '800', '"JetBrains Mono", monospace', 'center');
+      this.fillFittedText(ctx, isAct ? '● FOCUS' : (isLiveReady ? '▶ LIVE VDO' : '⏳ BUFFER'), vBoxX + 62, vBoxY + 27.5, 92, 12.5, '800', '"JetBrains Mono", monospace', 'center');
 
       ctx.restore(); // end video clip
 
@@ -4487,9 +4637,9 @@ class PresentationApp {
       ctx.stroke();
 
       ctx.fillStyle = '#64748B';
-      this.fillFittedText(ctx, '🏢 แผนกปลายทาง (Destination)', cx + 24, b1Y + 24, cardW - 48, 12, '700', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, '🏢 แผนกปลายทาง (Destination)', cx + 22, b1Y + 24, cardW - 44, 14.5, '700', '"Prompt", sans-serif');
       ctx.fillStyle = '#0F172A';
-      this.fillFittedText(ctx, item.target, cx + 24, b1Y + 54, cardW - 48, 15, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, item.target, cx + 22, b1Y + 56, cardW - 44, 17.5, '800', '"Prompt", sans-serif');
 
       // Block 2: Automation Process
       const b2Y = b1Y + bH + bGap;
@@ -4501,9 +4651,9 @@ class PresentationApp {
       ctx.stroke();
 
       ctx.fillStyle = '#64748B';
-      this.fillFittedText(ctx, '⚡ การประมวลผลอัตโนมัติ (Process)', cx + 24, b2Y + 24, cardW - 48, 12, '700', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, '⚡ การประมวลผลอัตโนมัติ (Process)', cx + 22, b2Y + 24, cardW - 44, 14.5, '700', '"Prompt", sans-serif');
       ctx.fillStyle = '#0F172A';
-      this.fillFittedText(ctx, item.process, cx + 24, b2Y + 54, cardW - 48, 14.5, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, item.process, cx + 22, b2Y + 56, cardW - 44, 17, '800', '"Prompt", sans-serif');
 
       // Block 3: Output Format
       const b3Y = b2Y + bH + bGap;
@@ -4515,9 +4665,9 @@ class PresentationApp {
       ctx.stroke();
 
       ctx.fillStyle = '#64748B';
-      this.fillFittedText(ctx, '📁 รูปแบบไฟล์ผลผลิต (Outputs)', cx + 24, b3Y + 24, cardW - 48, 12, '700', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, '📁 รูปแบบไฟล์ผลผลิต (Outputs)', cx + 22, b3Y + 24, cardW - 44, 14.5, '700', '"Prompt", sans-serif');
       ctx.fillStyle = '#0F172A';
-      this.fillFittedText(ctx, item.output, cx + 24, b3Y + 54, cardW - 48, 14.5, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, item.output, cx + 22, b3Y + 56, cardW - 44, 17, '800', '"Prompt", sans-serif');
 
       // Block 4: Key Advantage
       const b4Y = b3Y + bH + bGap;
@@ -4529,7 +4679,7 @@ class PresentationApp {
       ctx.stroke();
 
       ctx.fillStyle = isAct ? '#C2410C' : '#334155';
-      this.fillFittedText(ctx, item.benefit, cx + cardW / 2, b4Y + 42, cardW - 40, 13.5, '800', '"Prompt", sans-serif', 'center');
+      this.fillFittedText(ctx, item.benefit, cx + cardW / 2, b4Y + 42, cardW - 36, 16, '800', '"Prompt", sans-serif', 'center');
 
       // 2.4 Bottom Action Pill Button
       const btnY = cy + cardsH - 54;
@@ -4546,9 +4696,9 @@ class PresentationApp {
         ctx,
         isAct ? '✨ FOCUSING (กำลังโฟกัสผลผลิตนี้)' : '🔍 คลิกเพื่อเลือกผลผลิตนี้',
         cx + cardW / 2,
-        btnY + 25,
-        cardW - 48,
-        13,
+        btnY + 26,
+        cardW - 38,
+        15.5,
         '800',
         '"Prompt", sans-serif',
         'center'
@@ -8370,7 +8520,7 @@ class PresentationApp {
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2.0;
       ctx.setLineDash([8, 16]);
-      ctx.lineDashOffset = -nowSec * 32 * (speed || 1.0);
+      ctx.lineDashOffset = -nowSec * 10 * (speed || 1.0);
       ctx.stroke();
       ctx.restore();
     }

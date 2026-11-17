@@ -6,6 +6,19 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ease = v => 1-Math.pow(1-Math.max(0,Math.min(1,v)),3);
   const isFileProtocol = (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:');
+  const MOTION_SETTLE_SEC = 10.0;
+
+  // Motion runs for 10 seconds then settles cleanly (used by all slides except Slide 12 & Slide 14)
+  function getCappedMotion(app) {
+    const rawT = app.v3MotionEnabled !== false
+      ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0)
+      : MOTION_SETTLE_SEC;
+    return {
+      rawT,
+      isSettled: rawT >= MOTION_SETTLE_SEC,
+      t: Math.min(MOTION_SETTLE_SEC, rawT)
+    };
+  }
 
   function loadImage(src) {
     if (!src) return null;
@@ -95,7 +108,7 @@
   }
   function drawCoverScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
     
     // 1. Pristine Clean Background (Pure gradient + 3D Villa House & Fountain, 0 ghost boxes, 0 artifacts)
     const bgSrc = 'assets/ver3/slide_01_clean_bg.png';
@@ -230,7 +243,7 @@
       ctx.strokeStyle = 'rgba(41, 175, 140, ' + (0.85 * pCirc) + ')';
       ctx.lineWidth = 2.4;
       if (typeof ctx.setLineDash === 'function') ctx.setLineDash([7, 5]);
-      ctx.lineDashOffset = -t * 18;
+      ctx.lineDashOffset = isSettled ? 0 : -t * 18;
       if (typeof ctx.beginPath === 'function') {
         // Curve 1 (Top branch): From anchor (770, 735) to BOM (1320, 495) with smooth rounded fillet corners
         ctx.beginPath();
@@ -262,30 +275,32 @@
       }
       ctx.restore();
 
-      // Moving energy pulse dot along curved circuit
-      const pulseT = ((t * 0.9) % 1);
-      let pulseX, pulseY;
-      if (pulseT < 0.28) {
-        const segP = pulseT / 0.28;
-        pulseX = 770;
-        pulseY = 735 - segP * (735 - 545);
-      } else if (pulseT < 0.72) {
-        const segP = (pulseT - 0.28) / 0.44;
-        pulseX = 770 + segP * (1200 - 770);
-        pulseY = 545;
-      } else {
-        const segP = (pulseT - 0.72) / 0.28;
-        pulseX = 1200 + segP * (1320 - 1200);
-        pulseY = 545 + segP * (495 - 545);
+      // Moving energy pulse dot along curved circuit (stops after 10s)
+      if (!isSettled) {
+        const pulseT = ((t * 0.9) % 1);
+        let pulseX, pulseY;
+        if (pulseT < 0.28) {
+          const segP = pulseT / 0.28;
+          pulseX = 770;
+          pulseY = 735 - segP * (735 - 545);
+        } else if (pulseT < 0.72) {
+          const segP = (pulseT - 0.28) / 0.44;
+          pulseX = 770 + segP * (1200 - 770);
+          pulseY = 545;
+        } else {
+          const segP = (pulseT - 0.72) / 0.28;
+          pulseX = 1200 + segP * (1320 - 1200);
+          pulseY = 545 + segP * (495 - 545);
+        }
+        ctx.save();
+        ctx.fillStyle = '#ff9557';
+        ctx.shadowColor = 'rgba(255, 149, 87, 0.85)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(pulseX, pulseY, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
-      ctx.save();
-      ctx.fillStyle = '#ff9557';
-      ctx.shadowColor = 'rgba(255, 149, 87, 0.85)';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(pulseX, pulseY, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
 
     // 5. Vertical Stack Guide Wires (แบบเดิม)
@@ -313,7 +328,7 @@
       { id: 'production', name: 'Production', start: 4.8, cx: 1452, cy: 930, fill: 'rgba(52, 58, 62, 0.96)', stroke: '#ff9557' }
     ];
 
-    const activeIdx = t >= 5.8 ? Math.floor((t - 5.8) / 1.6) % 5 : -1;
+    const activeIdx = (!isSettled && t >= 5.8) ? Math.floor((t - 5.8) / 1.6) % 5 : -1;
 
     for (let i = 0; i < layers.length; i++) {
       const lay = layers[i];
@@ -325,7 +340,7 @@
       const dropY = (1 - easeEnter) * -60;
       const alpha = pEnter;
       const isActive = i === activeIdx;
-      const bobY = isActive ? Math.sin(t * 3.5) * 3 : 0;
+      const bobY = (isActive && !isSettled) ? Math.sin(t * 3.5) * 3 : 0;
       const curCy = lay.cy + dropY + bobY;
 
       ctx.save();
@@ -412,27 +427,27 @@
         ctx.fillStyle = '#1c2423';
         ctx.fillText('DWG', -58, -25);
 
-        ctx.font = 'italic 600 17px "Prompt", sans-serif';
+        ctx.font = 'italic 600 20px "Prompt", sans-serif';
         ctx.fillStyle = '#2a3230';
         ctx.fillText('> Assembly', -20, 2);
-        ctx.fillText('> Detail', -8, 26);
+        ctx.fillText('> Detail', -8, 28);
       } else if (lay.id === 'production') {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.font = 'italic 900 26px "Prompt", "Artifakt Element Black", "Arial Black", sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText('Purchasing', -75, -42);
-        ctx.font = 'italic 600 15px "Prompt", sans-serif';
+        ctx.font = 'italic 600 18.5px "Prompt", sans-serif';
         ctx.fillStyle = '#dddddd';
-        ctx.fillText('> Vendor', -45, -20);
+        ctx.fillText('> Vendor', -45, -18);
 
         ctx.font = 'italic 900 26px "Prompt", "Artifakt Element Black", "Arial Black", sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText('Production', -50, 12);
-        ctx.font = 'italic 600 14px "Prompt", sans-serif';
+        ctx.font = 'italic 600 17px "Prompt", sans-serif';
         ctx.fillStyle = '#dddddd';
-        ctx.fillText('> Smart Board Punching', -20, 34);
-        ctx.fillText('> Picking Part to Assembly', -5, 54);
+        ctx.fillText('> Smart Board Punching', -20, 35);
+        ctx.fillText('> Picking Part to Assembly', -5, 57);
       }
 
       ctx.restore();
@@ -487,7 +502,7 @@
 
   function drawBackgroundScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
 
     // 1. Draw Clean Pure Background Graphic WITHOUT text or baked pills (1920x1080)
     const pal = (typeof app.getCustomBackgroundPalette === 'function' && app.bgPreset && app.bgPreset !== 'default')
@@ -513,7 +528,15 @@
       const bgSrc = 'assets/ver3/slide_02_pure_bg.png';
       const bg = loadImage(bgSrc);
       if (bg && bg.complete && bg.naturalWidth) {
-        if (typeof ctx.drawImage === 'function') ctx.drawImage(bg, 0, 0, 1920, 1080);
+        if (typeof ctx.drawImage === 'function') {
+          ctx.drawImage(bg, 0, 0, 1920, 1080);
+          // Seamlessly extend left backdrop gradient (x < 1034, y: 395..869 -> 395..1080) to eliminate bottom cut-off band
+          ctx.drawImage(bg, 0, 395, 1034, 474, 0, 395, 1034, 685);
+          ctx.save();
+          ctx.fillStyle = 'rgba(255, 149, 87, 0.72)';
+          ctx.fillRect(1038, 870, 1.5, 96);
+          ctx.restore();
+        }
       } else {
         ctx.fillStyle = '#8ecfbd';
         ctx.fillRect(0, 0, 1920, 1080);
@@ -554,7 +577,7 @@
     }
 
     if (pal && pal.stops) {
-      drawPill(28, 368, 996, 466, 0, isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(130, 120, 175, 0.25)', null, 0);
+      drawPill(28, 368, 1004, 588, 0, isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(130, 120, 175, 0.25)', null, 0);
     }
 
     // Helper: Spring Ease & Scaling
@@ -657,97 +680,58 @@
     ctx.fillRect(titleX + 20, 311, 246, 6);
     ctx.restore();
 
-    // 3. REAL TEXT: 3 Pain Points on Left (Original Clean Minimal Style)
+    // 3. REAL TEXT: 3 Pain Points on Left (Original Transparent Style fitted cleanly within y = 375..945)
     const p1 = Math.min(1, Math.max(0, (t - 0.3) / 0.45));
     const p2 = Math.min(1, Math.max(0, (t - 0.7) / 0.45));
     const p3 = Math.min(1, Math.max(0, (t - 1.1) / 0.45));
     const numColor = isDark ? '#F8FAFC' : '#1c262d';
     const bodyColor = isDark ? '#E2E8F0' : '#142922';
 
-    // Point 01: Manpower Skill
-    if (p1 > 0) {
-      ctx.save();
-      ctx.globalAlpha = p1;
-      const offX = (1 - Math.pow(1 - p1, 3)) * 25;
-      const startX = 63 + offX;
+    const leftPoints = [
+      { p: p1, num: '01 |', key: 'Manpower Skill', pillW: 520, desc: '• ลดพึ่งพาทักษะเฉพาะคน ➔ สร้างมาตรฐานระบบ' },
+      { p: p2, num: '02 |', key: 'Loss Cost & Rework', pillW: 630, desc: '• ลด Error และแก้ไขแบบ ➔ ลดต้นทุนความสูญเสีย' },
+      { p: p3, num: '03 |', key: 'Reduce Time', pillW: 460, desc: '• ลดเวลาทำ BOM & DWG ➔ ทำงานเร็วขึ้น 7 เท่า' }
+    ];
 
-      ctx.font = '900 44px "Prompt", sans-serif';
+    leftPoints.forEach((lp, idx) => {
+      if (lp.p <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = lp.p;
+      const offX = (1 - Math.pow(1 - lp.p, 3)) * 24;
+      const startX = 64 + offX;
+      const pillY = 382 + idx * 194;
+      const pillH = 88;
+      const midY = pillY + pillH / 2;
+
+      // Bold Index Number (01 |, 02 |, 03 |)
+      ctx.font = '900 54px "Prompt", sans-serif';
       ctx.fillStyle = numColor;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText('01 |', startX, 431);
+      ctx.fillText(lp.num, startX, midY);
 
-      drawPill(startX + 98, 398, 370, 66, 33, 'rgba(185, 226, 213, 0.95)', '#f48c56', 2.5);
-      ctx.font = '800 32px "Prompt", sans-serif';
+      // Original Mint Capsule with Orange Accent Border + Bold Emphasized Keyword
+      const pillX = startX + 122;
+      drawPill(pillX, pillY, lp.pillW, pillH, 44, 'rgba(185, 226, 213, 0.95)', '#f48c56', 2.8);
+      ctx.font = '900 46px "Prompt", sans-serif';
       ctx.fillStyle = '#182422';
       ctx.textAlign = 'center';
-      ctx.fillText('Manpower Skill', startX + 98 + 185, 431);
+      ctx.fillText(lp.key, pillX + lp.pillW / 2, midY + 2);
 
-      ctx.font = '500 27px "Prompt", sans-serif';
+      // Crisp Bullet Explanation Directly Below Capsule (stops at y = 904..922 inside Left Frame)
+      ctx.font = '800 34px "Prompt", sans-serif';
       ctx.fillStyle = bodyColor;
       ctx.textAlign = 'left';
-      ctx.fillText('ลดการพึ่งพาทักษะเฉพาะบุคคลเพียงอย่างเดียว สร้างมาตรฐานการทำงานที่เป็นระบบ', startX, 506);
+      ctx.fillText(lp.desc, startX, pillY + pillH + 46);
       ctx.restore();
-    }
+    });
 
-    // Point 02: Loss Cost & Rework
-    if (p2 > 0) {
-      ctx.save();
-      ctx.globalAlpha = p2;
-      const offX = (1 - Math.pow(1 - p2, 3)) * 25;
-      const startX = 63 + offX;
-
-      ctx.font = '900 44px "Prompt", sans-serif';
-      ctx.fillStyle = numColor;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('02 |', startX, 581);
-
-      drawPill(startX + 98, 548, 440, 66, 33, 'rgba(185, 226, 213, 0.95)', '#f48c56', 2.5);
-      ctx.font = '800 32px "Prompt", sans-serif';
-      ctx.fillStyle = '#182422';
-      ctx.textAlign = 'center';
-      ctx.fillText('Loss Cost & Rework', startX + 98 + 220, 581);
-
-      ctx.font = '500 27px "Prompt", sans-serif';
-      ctx.fillStyle = bodyColor;
-      ctx.textAlign = 'left';
-      ctx.fillText('ลดข้อผิดพลาดจากการทำงาน และลดต้นทุนความสูญเสีย', startX, 656);
-      ctx.restore();
-    }
-
-    // Point 03: Reduce Time
-    if (p3 > 0) {
-      ctx.save();
-      ctx.globalAlpha = p3;
-      const offX = (1 - Math.pow(1 - p3, 3)) * 25;
-      const startX = 63 + offX;
-
-      ctx.font = '900 44px "Prompt", sans-serif';
-      ctx.fillStyle = numColor;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('03 |', startX, 731);
-
-      drawPill(startX + 98, 698, 310, 66, 33, 'rgba(185, 226, 213, 0.95)', '#f48c56', 2.5);
-      ctx.font = '800 32px "Prompt", sans-serif';
-      ctx.fillStyle = '#182422';
-      ctx.textAlign = 'center';
-      ctx.fillText('Reduce Time', startX + 98 + 155, 731);
-
-      ctx.font = '500 27px "Prompt", sans-serif';
-      ctx.fillStyle = bodyColor;
-      ctx.textAlign = 'left';
-      ctx.fillText('ลดระยะเวลาการจัดทำ BOM และ Drawing เพิ่มความรวดเร็วในการทำงาน', startX, 806);
-      ctx.restore();
-    }
-
-    // 4. RIGHT-SIDE FLOWCHART ANIMATION
+    // 4. RIGHT-SIDE FLOWCHART ANIMATION (Balanced & fitted cleanly inside Right Frame y = 90..968)
     const pContainer = Math.min(1, Math.max(0, (t - 1.2) / 0.55));
     if (pContainer > 0) {
       ctx.save();
       ctx.globalAlpha = pContainer;
-      drawPill(1205, 236, 500, 672, 32, 'rgba(255, 255, 255, 0.05)', '#ff9557', 3);
+      drawPill(1205, 224, 500, 742, 32, 'rgba(255, 255, 255, 0.05)', '#ff9557', 3);
       ctx.restore();
     }
 
@@ -759,9 +743,10 @@
       if (tabImg && tabImg.complete && tabImg.naturalWidth) {
         ctx.save();
         ctx.globalAlpha = pTablet;
-        const hoverY = 95 + Math.sin(t * 2) * 5;
+        const hoverDamp = isSettled ? 0 : Math.max(0, 1 - t / 10);
+        const hoverY = 90 + Math.sin(t * 2) * 5 * hoverDamp;
         if (typeof ctx.drawImage === 'function') {
-          ctx.drawImage(tabImg, 1075, hoverY, 340, 352);
+          ctx.drawImage(tabImg, 1075, hoverY, 320, 332);
         }
         ctx.restore();
       }
@@ -770,189 +755,189 @@
     // --- STAGE 1: Inputs (House Floorplan & Planning Rule) ---
     const s1Scale = popScale((t - 1.6) / 0.5);
     if (s1Scale > 0) {
-      drawScaled(1045 + 69, 385 + 69, s1Scale, () => {
-        drawPill(1045, 385, 138, 138, 69, '#b1c2ff', '#8dd4c2', 2.5);
+      drawScaled(1045 + 69, 400 + 72, s1Scale, () => {
+        drawPill(1045, 400, 138, 144, 72, '#b1c2ff', '#8dd4c2', 2.5);
         ctx.save();
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 20px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('House', 1045 + 69, 385 + 56);
-        ctx.fillText('Floorplan', 1045 + 69, 385 + 82);
+        ctx.fillText('House', 1045 + 69, 400 + 58);
+        ctx.fillText('Floorplan', 1045 + 69, 400 + 86);
         ctx.restore();
       });
 
-      drawScaled(1045 + 69, 545 + 112, s1Scale, () => {
-        drawPill(1045, 545, 138, 224, 48, '#b1c2ff', '#8dd4c2', 2.5);
+      drawScaled(1045 + 69, 576 + 150, s1Scale, () => {
+        drawPill(1045, 576, 138, 300, 48, '#b1c2ff', '#8dd4c2', 2.5);
         ctx.save();
-        ctx.font = '700 14px "Prompt", sans-serif';
+        ctx.font = '800 18.5px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Planning', 1045 + 69, 545 + 52);
-        ctx.fillText('Rule', 1045 + 69, 545 + 74);
-        ctx.fillText('&', 1045 + 69, 545 + 94);
-        ctx.fillText('Standard', 1045 + 69, 545 + 114);
-        ctx.fillText('Variation', 1045 + 69, 545 + 136);
+        ctx.fillText('Planning', 1045 + 69, 576 + 88);
+        ctx.fillText('Rule', 1045 + 69, 576 + 118);
+        ctx.fillText('&', 1045 + 69, 576 + 148);
+        ctx.fillText('Standard', 1045 + 69, 576 + 178);
+        ctx.fillText('Variation', 1045 + 69, 576 + 208);
         ctx.restore();
       });
     }
 
     // --- ARROW 1: Stage 1 -> Stage 2 ---
     const pArr1 = Math.min(1, Math.max(0, (t - 2.2) / 0.35));
-    drawArrow(1045 + 138, 454, 1225, 454, pArr1);
+    drawArrow(1045 + 138, 472, 1225, 472, pArr1);
 
     // --- STAGE 2: BOM & Processing Capsule ---
     const s2Scale = popScale((t - 2.4) / 0.55);
     if (s2Scale > 0) {
-      drawScaled(1225 + 69, 375 + 180, s2Scale, () => {
-        drawPill(1225, 375, 138, 360, 50, '#ff9557', null);
+      drawScaled(1225 + 69, 375 + 255, s2Scale, () => {
+        drawPill(1225, 375, 138, 510, 50, '#ff9557', null);
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 21px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
-        ctx.fillText('BOM', 1225 + 69, 375 + 55);
-        ctx.fillText('Floorplan', 1225 + 69, 375 + 80);
+        ctx.fillText('BOM', 1225 + 69, 375 + 72);
+        ctx.fillText('Floorplan', 1225 + 69, 375 + 102);
 
-        ctx.fillText('DWG', 1225 + 69, 375 + 165);
-        ctx.fillText('Detail', 1225 + 69, 375 + 190);
+        ctx.fillText('DWG', 1225 + 69, 375 + 234);
+        ctx.fillText('Detail', 1225 + 69, 375 + 264);
 
-        ctx.font = '700 14px "Prompt", sans-serif';
-        ctx.fillText('Data', 1225 + 69, 375 + 272);
-        ctx.fillText('Material', 1225 + 69, 375 + 293);
-        ctx.fillText('Information', 1225 + 69, 375 + 314);
+        ctx.font = '700 18px "Prompt", sans-serif';
+        ctx.fillText('Data', 1225 + 69, 375 + 392);
+        ctx.fillText('Material', 1225 + 69, 375 + 420);
+        ctx.fillText('Information', 1225 + 69, 375 + 448);
         ctx.restore();
       });
     }
 
     // --- ARROW 2: Stage 2 -> Stage 3 (PO) ---
     const pArr2 = Math.min(1, Math.max(0, (t - 3.0) / 0.35));
-    drawArrow(1225 + 138, 454, 1388, 454, pArr2);
+    drawArrow(1225 + 138, 472, 1388, 472, pArr2);
 
     // --- STAGE 3: Orders, Picking, and Production DWG ---
     const s3Scale = popScale((t - 3.2) / 0.5);
     if (s3Scale > 0) {
-      drawScaled(1388 + 69, 385 + 69, s3Scale, () => {
-        drawPill(1388, 385, 138, 138, 69, '#ff9557', null);
+      drawScaled(1388 + 69, 400 + 72, s3Scale, () => {
+        drawPill(1388, 400, 138, 144, 72, '#ff9557', null);
         ctx.save();
-        ctx.font = '900 25px "Prompt", sans-serif';
+        ctx.font = '900 26px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('PO', 1388 + 69, 385 + 69);
+        ctx.fillText('PO', 1388 + 69, 400 + 72);
         ctx.restore();
       });
 
-      drawScaled(1388 + 69, 535 + 69, s3Scale, () => {
-        drawPill(1388, 535, 138, 138, 69, '#ff9557', null);
+      drawScaled(1388 + 69, 568 + 72, s3Scale, () => {
+        drawPill(1388, 568, 138, 144, 72, '#ff9557', null);
         ctx.save();
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 20px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Picking', 1388 + 69, 535 + 56);
-        ctx.fillText('Data', 1388 + 69, 535 + 82);
+        ctx.fillText('Picking', 1388 + 69, 568 + 58);
+        ctx.fillText('Data', 1388 + 69, 568 + 86);
         ctx.restore();
       });
 
-      drawScaled(1388 + 69, 685 + 108, s3Scale, () => {
-        drawPill(1388, 685, 138, 216, 48, '#ff9557', null);
+      drawScaled(1388 + 69, 736 + 106, s3Scale, () => {
+        drawPill(1388, 736, 138, 212, 48, '#ff9557', null);
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 21px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
-        ctx.fillText('DWG', 1388 + 69, 685 + 68);
-        ctx.font = '700 14px "Prompt", sans-serif';
-        ctx.fillText('Detail for', 1388 + 69, 685 + 95);
-        ctx.fillText('Production', 1388 + 69, 685 + 118);
+        ctx.fillText('DWG', 1388 + 69, 736 + 68);
+        ctx.font = '700 17.5px "Prompt", sans-serif';
+        ctx.fillText('Detail for', 1388 + 69, 736 + 102);
+        ctx.fillText('Production', 1388 + 69, 736 + 130);
         ctx.restore();
       });
     }
 
     // --- ARROWS from Stage 3 ---
     const pArr3 = Math.min(1, Math.max(0, (t - 4.0) / 0.35));
-    drawArrow(1388 + 138, 454, 1548, 454, pArr3);
+    drawArrow(1388 + 138, 472, 1548, 472, pArr3);
 
     const pArr4 = Math.min(1, Math.max(0, (t - 4.0) / 0.35));
-    drawArrow(1388 + 138, 604, 1548, 604, pArr4);
+    drawArrow(1388 + 138, 640, 1548, 640, pArr4);
 
     const pArr5 = Math.min(1, Math.max(0, (t - 5.0) / 0.45));
-    drawArrow(1388 + 138, 793, 1722, 793, pArr5);
+    drawArrow(1388 + 138, 842, 1722, 842, pArr5);
 
     // --- STAGE 4: Vendor & Store ---
     const s4Scale = popScale((t - 4.2) / 0.5);
     if (s4Scale > 0) {
-      drawScaled(1548 + 69, 295 + 110, s4Scale, () => {
-        drawPill(1548, 295, 138, 220, 48, '#ff9557', null);
+      drawScaled(1548 + 69, 285 + 120, s4Scale, () => {
+        drawPill(1548, 285, 138, 240, 48, '#ff9557', null);
         ctx.save();
         ctx.font = '900 24px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Vendor', 1548 + 69, 295 + 110);
+        ctx.fillText('Vendor', 1548 + 69, 285 + 120);
         ctx.restore();
       });
 
-      drawScaled(1548 + 69, 535 + 110, s4Scale, () => {
-        drawPill(1548, 535, 138, 220, 48, '#ff9557', null);
+      drawScaled(1548 + 69, 555 + 120, s4Scale, () => {
+        drawPill(1548, 555, 138, 240, 48, '#ff9557', null);
         ctx.save();
         ctx.font = '900 24px "Prompt", sans-serif';
         ctx.fillStyle = '#1c2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Store', 1548 + 69, 535 + 110);
+        ctx.fillText('Store', 1548 + 69, 555 + 120);
         ctx.restore();
       });
     }
 
     // --- ARROW 6: Downward Arrow from Vendor to Store ---
     const pArr6 = Math.min(1, Math.max(0, (t - 4.5) / 0.35));
-    drawArrow(1548 + 69, 515, 1548 + 69, 535, pArr6);
+    drawArrow(1548 + 69, 525, 1548 + 69, 555, pArr6);
 
     // --- ARROW 7: Store -> Stage 5 ---
     const pArr7 = Math.min(1, Math.max(0, (t - 5.0) / 0.35));
-    drawArrow(1548 + 138, 645, 1722, 645, pArr7);
+    drawArrow(1548 + 138, 675, 1722, 675, pArr7);
 
     // --- STAGE 5: Production Process & Customer Hero Capsule ---
     const s5Scale = popScale((t - 5.2) / 0.55);
     if (s5Scale > 0) {
-      drawScaled(1722 + 74, 345 + 242, s5Scale, () => {
-        drawPill(1722, 345, 148, 485, 58, '#2d353b', '#8dd4c2', 2.5);
+      drawScaled(1722 + 74, 325 + 295, s5Scale, () => {
+        drawPill(1722, 325, 148, 590, 58, '#2d353b', '#8dd4c2', 2.5);
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
 
-        ctx.font = '600 17px "Prompt", sans-serif';
-        ctx.fillText('Production', 1722 + 74, 345 + 140);
-        ctx.font = '900 25px "Prompt", sans-serif';
-        ctx.fillText('Process', 1722 + 74, 345 + 172);
+        ctx.font = '600 21px "Prompt", sans-serif';
+        ctx.fillText('Production', 1722 + 74, 325 + 186);
+        ctx.font = '900 26px "Prompt", sans-serif';
+        ctx.fillText('Process', 1722 + 74, 325 + 220);
 
-        ctx.font = '700 20px "Prompt", sans-serif';
+        ctx.font = '700 22px "Prompt", sans-serif';
         ctx.fillStyle = '#8dd4c2';
-        ctx.fillText('–', 1722 + 74, 345 + 200);
+        ctx.fillText('–', 1722 + 74, 325 + 252);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '800 15px "Prompt", sans-serif';
-        ctx.fillText('PACKING', 1722 + 74, 345 + 240);
-        ctx.fillText('TO', 1722 + 74, 345 + 264);
-        ctx.fillText('CUSTOMER', 1722 + 74, 345 + 288);
+        ctx.font = '800 18.5px "Prompt", sans-serif';
+        ctx.fillText('PACKING', 1722 + 74, 325 + 300);
+        ctx.fillText('TO', 1722 + 74, 325 + 330);
+        ctx.fillText('CUSTOMER', 1722 + 74, 325 + 360);
         ctx.restore();
       });
     }
 
-    // --- 5. ACTIVE FLOW ENERGY PARTICLES (Continuous Loop when t >= 6.0) ---
-    if (t >= 6.0) {
-      drawArrowPulse(1045 + 138, 454, 1225, 454, 0.0);
-      drawArrowPulse(1225 + 138, 454, 1388, 454, 0.2);
-      drawArrowPulse(1388 + 138, 454, 1548, 454, 0.4);
-      drawArrowPulse(1548 + 69, 515, 1548 + 69, 535, 0.55);
-      drawArrowPulse(1388 + 138, 604, 1548, 604, 0.45);
-      drawArrowPulse(1548 + 138, 645, 1722, 645, 0.7);
-      drawArrowPulse(1388 + 138, 793, 1722, 793, 0.5);
+    // --- 5. ACTIVE FLOW ENERGY PARTICLES (Runs from 6.0s -> 10.0s, then stops cleanly) ---
+    if (t >= 6.0 && !isSettled) {
+      drawArrowPulse(1045 + 138, 472, 1225, 472, 0.0);
+      drawArrowPulse(1225 + 138, 472, 1388, 472, 0.2);
+      drawArrowPulse(1388 + 138, 472, 1548, 472, 0.4);
+      drawArrowPulse(1548 + 69, 525, 1548 + 69, 555, 0.55);
+      drawArrowPulse(1388 + 138, 640, 1548, 640, 0.45);
+      drawArrowPulse(1548 + 138, 675, 1722, 675, 0.7);
+      drawArrowPulse(1388 + 138, 842, 1722, 842, 0.5);
     }
 
     // --- 6. PAGE NUMBER BADGE -> 03 / 16 ---
@@ -961,7 +946,7 @@
 
   function drawExistingWorkflowScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
 
     // 1. Draw Clean Pure Background Graphic (1920x1080)
     const bgSrc = 'assets/ver3/slide_03_pure_bg.png';
@@ -1196,7 +1181,8 @@
       const tabSrc = 'assets/ver3/slide_02_tablet.png';
       const tabImg = loadImage(tabSrc);
       if (tabImg && tabImg.complete && tabImg.naturalWidth) {
-        const hoverY = 445 + Math.sin(t * 2) * 4;
+        const hoverDamp = isSettled ? 0 : Math.max(0, 1 - t / 10);
+        const hoverY = 445 + Math.sin(t * 2) * 4 * hoverDamp;
         if (typeof ctx.drawImage === 'function') ctx.drawImage(tabImg, 36, hoverY, 195, 202);
       }
 
@@ -1206,13 +1192,13 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillText('OTF', 132, 686);
 
-      ctx.font = '800 18px "Prompt", sans-serif';
+      ctx.font = '800 21px "Prompt", sans-serif';
       ctx.fillStyle = '#162e26';
-      ctx.fillText('Order to Factory', 132, 722);
+      ctx.fillText('Order to Factory', 132, 724);
 
-      ctx.font = '600 15px "Prompt", sans-serif';
+      ctx.font = '600 18px "Prompt", sans-serif';
       ctx.fillStyle = '#243c34';
-      ctx.fillText('(For Construction DWG)', 132, 748);
+      ctx.fillText('(For Construction DWG)', 132, 752);
       ctx.restore();
     }
 
@@ -1266,7 +1252,7 @@
           ctx.drawImage(fp1, 332, Y_BOM - 114, 62, 54);
         } else {
           ctx.save();
-          ctx.font = '700 12px "Prompt", sans-serif';
+          ctx.font = '700 15px "Prompt", sans-serif';
           ctx.fillStyle = '#2b8a6e';
           ctx.textAlign = 'center';
           ctx.fillText('PLAN', 363, Y_BOM - 84);
@@ -1276,7 +1262,7 @@
           ctx.drawImage(fp2, 410, Y_BOM - 114, 62, 54);
         } else {
           ctx.save();
-          ctx.font = '700 12px "Prompt", sans-serif';
+          ctx.font = '700 15px "Prompt", sans-serif';
           ctx.fillStyle = '#2b8a6e';
           ctx.textAlign = 'center';
           ctx.fillText('SCHED', 441, Y_BOM - 84);
@@ -1352,17 +1338,15 @@
         if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(vBoxX + 44, vBoxY + 15, 4.5, 0, Math.PI * 2); ctx.fill(); }
 
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '700 11px "Prompt", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('WEB BOM · Menu Select / Free Input', vBoxX + 58, vBoxY + 19);
+        app.fillFittedText(ctx, 'WEB BOM · Menu Select / Free Input', vBoxX + 54, vBoxY + 19, vBoxW - 118, 12.5, '700', '"Prompt", sans-serif', 'left');
 
-        // Live REC / AUTO Play Indicator
-        const blink = Math.sin(t * 5) > 0;
-        ctx.fillStyle = blink ? '#ef4444' : '#94a3b8';
-        if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(vBoxX + vBoxW - 48, vBoxY + 15, 4, 0, Math.PI * 2); ctx.fill(); }
+        // Live REC indicator (settles to calm steady dot after 10s)
+        const blink = !isSettled && Math.sin(t * 5) > 0;
+        ctx.fillStyle = isSettled ? '#10b981' : (blink ? '#ef4444' : '#94a3b8');
+        if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(vBoxX + vBoxW - 54, vBoxY + 15, 4, 0, Math.PI * 2); ctx.fill(); }
         ctx.fillStyle = '#f8fafc';
-        ctx.font = '700 10px "Prompt", sans-serif';
-        ctx.fillText('LIVE', vBoxX + vBoxW - 39, vBoxY + 19);
+        ctx.font = '700 12px "Prompt", sans-serif';
+        ctx.fillText(isSettled ? 'DONE' : 'LIVE', vBoxX + vBoxW - 44, vBoxY + 19);
 
         // Check if user provided a custom video clip for the web workflow
         const customWebVdoSrc = s.webVideoSrc || '';
@@ -1370,17 +1354,29 @@
         if (customVid && customVid.readyState >= 2 && typeof app.drawMediaCover === 'function') {
           app.drawMediaCover(ctx, customVid, customVid.videoWidth || 640, customVid.videoHeight || 480, vBoxX + 2, vBoxY + 30, vBoxW - 4, vBoxH - 32);
         } else {
-          // Procedural Live Simulation of Legacy Web Menu Select / Free Input
-          // Top Mode Tabs inside Web Page
+          // Procedural Live Simulation of Legacy Web Menu Select / Free Input (runs for 10s, then stops cleanly on Menu Select)
           const tabsImg = loadImage('assets/ver3/slide_04_tabs.png');
           if (tabsImg && tabsImg.complete && tabsImg.naturalWidth && typeof ctx.drawImage === 'function') {
             ctx.drawImage(tabsImg, vBoxX + 8, vBoxY + 36, vBoxW - 16, 30);
           }
 
-          // Cycle through 3 real web screens every 4.5 seconds
-          const webCycle = (t * 0.9) % 13.5;
-          const webPhase = webCycle < 4.5 ? 0 : (webCycle < 9.0 ? 1 : 2);
-          const subP = (webCycle % 4.5) / 4.5;
+          let webPhase = 0;
+          let subP = 0;
+          if (!isSettled) {
+            if (t < 5.2) {
+              webPhase = 0;
+              subP = Math.max(0, (t - 2.0) / 3.2);
+            } else if (t < 7.4) {
+              webPhase = 1;
+              subP = (t - 5.2) / 2.2;
+            } else if (t < 9.3) {
+              webPhase = 2;
+              subP = (t - 7.4) / 1.9;
+            } else {
+              webPhase = 0;
+              subP = 0.5;
+            }
+          }
 
           // Active Tab Highlight Box on top tabs
           const tabHighlightX = webPhase === 0 ? vBoxX + 200 : (webPhase === 1 ? vBoxX + 136 : vBoxX + 260);
@@ -1397,23 +1393,23 @@
             if (menuImg && menuImg.complete && menuImg.naturalWidth && typeof ctx.drawImage === 'function') {
               ctx.drawImage(menuImg, vBoxX + 6, contentY, vBoxW - 12, contentH);
             }
-            // Animated selection scan bar across columns
-            const colIdx = Math.min(3, Math.floor(subP * 4));
-            const scanX = vBoxX + 14 + colIdx * 76;
-            const scanY = contentY + 62 + Math.sin(subP * Math.PI * 2) * 18;
-            ctx.fillStyle = 'rgba(255, 149, 87, 0.24)';
-            ctx.fillRect(scanX, scanY, 72, 22);
-            ctx.strokeStyle = '#ff9557';
-            ctx.lineWidth = 1.8;
-            ctx.strokeRect(scanX, scanY, 72, 22);
+            if (!isSettled) {
+              const colIdx = Math.min(3, Math.floor(subP * 4));
+              const scanX = vBoxX + 14 + colIdx * 76;
+              const scanY = contentY + 62 + Math.sin(subP * Math.PI * 2) * 18;
+              ctx.fillStyle = 'rgba(255, 149, 87, 0.24)';
+              ctx.fillRect(scanX, scanY, 72, 22);
+              ctx.strokeStyle = '#ff9557';
+              ctx.lineWidth = 1.8;
+              ctx.strokeRect(scanX, scanY, 72, 22);
+            }
           } else if (webPhase === 1) {
             // Screen 2: Dropdown Parameters (Top Size / Opening Type / Size / Position Matrix)
             const compImg = loadImage('assets/ver3/slide_04_station3_composite.png');
             if (compImg && compImg.complete && compImg.naturalWidth && typeof ctx.drawImage === 'function') {
               ctx.drawImage(compImg, vBoxX + 6, contentY, vBoxW - 12, contentH);
             }
-            // Animated row highlight on parameter matrix
-            const rowIdx = Math.floor(subP * 8);
+            const rowIdx = Math.min(7, Math.floor(subP * 8));
             const ry = contentY + 46 + rowIdx * 22;
             ctx.fillStyle = 'rgba(37, 99, 235, 0.18)';
             ctx.fillRect(vBoxX + 166, ry, 148, 20);
@@ -1426,8 +1422,7 @@
             if (freeImg && freeImg.complete && freeImg.naturalWidth && typeof ctx.drawImage === 'function') {
               ctx.drawImage(freeImg, vBoxX + 6, contentY, vBoxW - 12, contentH);
             }
-            // Animated row-by-row manual entry highlight
-            const rowIdx = Math.floor(subP * 10);
+            const rowIdx = Math.min(9, Math.floor(subP * 10));
             const ry = contentY + 58 + rowIdx * 18;
             ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
             ctx.fillRect(vBoxX + 10, ry, vBoxW - 20, 16);
@@ -1436,73 +1431,72 @@
             ctx.strokeRect(vBoxX + 10, ry, vBoxW - 20, 16);
           }
 
-          // Animated Mouse Pointer inside the Web Simulator
-          const curX = vBoxX + 65 + ((Math.sin(t * 1.7) + 1) * 0.5) * 200;
-          const curY = contentY + 45 + ((Math.cos(t * 2.3) + 1) * 0.5) * (contentH - 70);
-          ctx.fillStyle = '#0f172a';
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.5;
-          if (typeof ctx.beginPath === 'function') {
-            ctx.beginPath();
-            ctx.moveTo(curX, curY);
-            ctx.lineTo(curX, curY + 16);
-            ctx.lineTo(curX + 4.5, curY + 12.5);
-            ctx.lineTo(curX + 8.5, curY + 19);
-            ctx.lineTo(curX + 11, curY + 17.5);
-            ctx.lineTo(curX + 7, curY + 11);
-            ctx.lineTo(curX + 12, curY + 11);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+          // Animated Mouse Pointer inside the Web Simulator (stops & hides cleanly at 10s)
+          if (!isSettled) {
+            const curX = vBoxX + 65 + ((Math.sin(t * 1.7) + 1) * 0.5) * 200;
+            const curY = contentY + 45 + ((Math.cos(t * 2.3) + 1) * 0.5) * (contentH - 70);
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            if (typeof ctx.beginPath === 'function') {
+              ctx.beginPath();
+              ctx.moveTo(curX, curY);
+              ctx.lineTo(curX, curY + 16);
+              ctx.lineTo(curX + 4.5, curY + 12.5);
+              ctx.lineTo(curX + 8.5, curY + 19);
+              ctx.lineTo(curX + 11, curY + 17.5);
+              ctx.lineTo(curX + 7, curY + 11);
+              ctx.lineTo(curX + 12, curY + 11);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+            }
           }
 
           // Bottom Status Caption Bar inside Web Box
           ctx.fillStyle = '#0f172a';
-          ctx.fillRect(vBoxX, vBoxY + vBoxH - 28, vBoxW, 28);
+          ctx.fillRect(vBoxX, vBoxY + vBoxH - 30, vBoxW, 30);
           ctx.fillStyle = '#34d399';
-          ctx.font = '700 11px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
           const stepCaptions = [
             '1/3 · Selecting Category: Windows > Tostem > Hi-K',
             '2/3 · Manual Dropdown: Top Size / Opening / Grid Size',
             '3/3 · Free Input Table: Manual Coding One-by-One'
           ];
-          ctx.fillText(stepCaptions[webPhase], vBoxX + vBoxW / 2, vBoxY + vBoxH - 10);
+          app.fillFittedText(ctx, stepCaptions[webPhase], vBoxX + vBoxW / 2, vBoxY + vBoxH - 9, vBoxW - 14, 13, '700', '"Prompt", sans-serif', 'center');
         }
         ctx.restore();
 
         // RIGHT PARAMETER LIST inside Menu Select / Free Input (cleanly inset from right border x=1062)
         ctx.textAlign = 'left';
-        ctx.font = '800 15px "Prompt", sans-serif';
+        ctx.font = '800 16.5px "Prompt", sans-serif';
         ctx.fillStyle = '#142922';
-        ctx.fillText('Menu 1', 868, 488);
-        ctx.fillText('Menu 2', 868, 524);
-        ctx.fillText('Menu 3', 868, 560);
+        ctx.fillText('Menu 1', 864, 488);
+        ctx.fillText('Menu 2', 864, 524);
+        ctx.fillText('Menu 3', 864, 560);
 
         // Curly Bracket { spanning the 6 parameters
         ctx.strokeStyle = '#2b8a6e';
         ctx.lineWidth = 2.8;
         if (typeof ctx.beginPath === 'function') {
           ctx.beginPath();
-          ctx.moveTo(940, 428);
-          ctx.quadraticCurveTo(931, 428, 931, 442);
-          ctx.lineTo(931, 508);
-          ctx.quadraticCurveTo(931, 520, 922, 520);
-          ctx.quadraticCurveTo(931, 520, 931, 532);
-          ctx.lineTo(931, 598);
-          ctx.quadraticCurveTo(931, 612, 940, 612);
+          ctx.moveTo(944, 428);
+          ctx.quadraticCurveTo(935, 428, 935, 442);
+          ctx.lineTo(935, 508);
+          ctx.quadraticCurveTo(935, 520, 926, 520);
+          ctx.quadraticCurveTo(935, 520, 935, 532);
+          ctx.lineTo(935, 598);
+          ctx.quadraticCurveTo(935, 612, 944, 612);
           ctx.stroke();
         }
 
         // Parameter Items
-        ctx.font = '700 13.5px "Prompt", sans-serif';
         ctx.fillStyle = '#183027';
-        ctx.fillText('CODE', 946, 434);
-        ctx.fillText('Amount / Unit', 946, 468);
-        ctx.fillText('Position', 946, 502);
-        ctx.fillText('Size (Grid Line)', 946, 536);
-        ctx.fillText('Bottom Win', 946, 570);
-        ctx.fillText('Top Win', 946, 604);
+        app.fillFittedText(ctx, 'CODE', 950, 434, 106, 16, '700', '"Prompt", sans-serif', 'left');
+        app.fillFittedText(ctx, 'Amount / Unit', 950, 468, 106, 16, '700', '"Prompt", sans-serif', 'left');
+        app.fillFittedText(ctx, 'Position', 950, 502, 106, 16, '700', '"Prompt", sans-serif', 'left');
+        app.fillFittedText(ctx, 'Size (Grid Line)', 950, 536, 106, 16, '700', '"Prompt", sans-serif', 'left');
+        app.fillFittedText(ctx, 'Bottom Win', 950, 570, 106, 16, '700', '"Prompt", sans-serif', 'left');
+        app.fillFittedText(ctx, 'Top Win', 950, 604, 106, 16, '700', '"Prompt", sans-serif', 'left');
 
         ctx.restore();
       });
@@ -1534,20 +1528,20 @@
           }
         });
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '800 9.5px "Prompt", sans-serif';
+        ctx.font = '800 12px "Prompt", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('AUTOCAD 2D · ASSEMBLY_DWG.DWG', cadX + 50, cadY + 17);
+        ctx.fillText('AUTOCAD 2D · ASSEMBLY_DWG.DWG', cadX + 46, cadY + 17);
 
-        const cadPulse = 0.5 + 0.5 * Math.sin(t * 5.2);
+        const cadPulse = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 5.2));
         if (typeof ctx.beginPath === 'function') {
           ctx.beginPath();
-          ctx.arc(cadX + cadW - 38, cadY + 14, 3.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(34, 197, 94, ${0.65 + 0.35 * cadPulse})`;
+          ctx.arc(cadX + cadW - 48, cadY + 14, 3.6, 0, Math.PI * 2);
+          ctx.fillStyle = isSettled ? '#22c55e' : `rgba(34, 197, 94, ${0.65 + 0.35 * cadPulse})`;
           ctx.fill();
         }
         ctx.fillStyle = '#86efac';
-        ctx.font = '800 8.5px "Prompt", sans-serif';
-        ctx.fillText('LIVE', cadX + cadW - 30, cadY + 17);
+        ctx.font = '800 11px "Prompt", sans-serif';
+        ctx.fillText(isSettled ? 'DONE' : 'LIVE', cadX + cadW - 39, cadY + 17);
 
         let drewCustomCadVideo = false;
         if (s && s.cadVideoSrc && typeof document !== 'undefined') {
@@ -1625,7 +1619,7 @@
               ctx.restore();
 
               ctx.beginPath();
-              ctx.arc(gc.x, vpY + 11, 7, 0, Math.PI * 2);
+              ctx.arc(gc.x, vpY + 12, 9, 0, Math.PI * 2);
               ctx.fillStyle = '#1e293b';
               ctx.fill();
               ctx.strokeStyle = '#38bdf8';
@@ -1633,14 +1627,15 @@
               ctx.stroke();
             }
             ctx.fillStyle = '#38bdf8';
-            ctx.font = '800 8px "Prompt", sans-serif';
+            ctx.font = '800 11px "Prompt", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(gc.lbl, gc.x, vpY + 14);
+            ctx.fillText(gc.lbl, gc.x, vpY + 16);
           });
 
           // 2D Wall & Window Assembly Panels (3 bays between A-B, B-C, C-D)
-          const cadCycle = (t * 0.78) % 3;
-          const activeBay = Math.floor(cadCycle);
+          // Runs sequentially across 2.2s -> 9.8s, then shows all 3 completed cleanly after 10s
+          const cadProgress = Math.max(0, t - 2.2) / 2.55;
+          const activeBay = Math.min(2, Math.floor(cadProgress));
           const bays = [
             { x: vpX + 44, w: 80, y: vpY + 34, h: 96, code: 'ST-12B-W1', dim: '900', type: 'wall-win' },
             { x: vpX + 124, w: 80, y: vpY + 34, h: 96, code: 'FT-24A-D2', dim: '1800', type: 'door' },
@@ -1648,8 +1643,8 @@
           ];
 
           bays.forEach((bay, bIdx) => {
-            const isCurr = bIdx === activeBay;
-            const isDone = bIdx < activeBay;
+            const isCurr = !isSettled && bIdx === activeBay;
+            const isDone = isSettled || bIdx < activeBay;
 
             // Outer 2D CAD Panel Frame
             ctx.strokeStyle = isCurr ? '#facc15' : (isDone ? '#22c55e' : '#38bdf8');
@@ -1684,58 +1679,56 @@
 
             // Dimension line at bottom of panel
             ctx.fillStyle = '#94a3b8';
-            ctx.font = '700 7.5px "Prompt", sans-serif';
+            ctx.font = '700 11px "Prompt", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`◄ ${bay.dim} ►`, bay.x + bay.w / 2, bay.y + bay.h + 13);
+            ctx.fillText(`◄ ${bay.dim} ►`, bay.x + bay.w / 2, bay.y + bay.h + 15);
 
             // Manual Code Tag inside panel
             const typedLen = isCurr
-              ? Math.max(2, Math.floor(((cadCycle - bIdx) / 0.85) * bay.code.length))
+              ? Math.max(2, Math.floor(((cadProgress - bIdx) / 0.85) * bay.code.length))
               : bay.code.length;
             const shownCode = isCurr ? bay.code.slice(0, typedLen) + (Math.sin(t * 9) > 0 ? '|' : '') : bay.code;
 
             drawPill(
-              bay.x + 6,
-              bay.y + bay.h - 24,
-              bay.w - 12,
-              18,
+              bay.x + 4,
+              bay.y + bay.h - 26,
+              bay.w - 8,
+              21,
               4,
               isCurr ? 'rgba(250, 204, 21, 0.22)' : 'rgba(15, 23, 42, 0.88)',
               isCurr ? '#facc15' : '#22c55e',
               1.1
             );
             ctx.fillStyle = isCurr ? '#fef08a' : '#86efac';
-            ctx.font = '800 8px "Consolas", "Prompt", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(shownCode, bay.x + bay.w / 2, bay.y + bay.h - 12);
+            app.fillFittedText(ctx, shownCode, bay.x + bay.w / 2, bay.y + bay.h - 11.5, bay.w - 14, 11, '800', '"Consolas", "Prompt", monospace', 'center');
           });
 
-          // Animated AutoCAD Crosshair Cursor (+) with Pickbox
-          const targetBay = bays[activeBay];
-          const chX = targetBay.x + targetBay.w / 2 + Math.sin(t * 3.8) * 14;
-          const chY = targetBay.y + 42 + Math.cos(t * 3.8) * 10;
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.1;
-          if (typeof ctx.beginPath === 'function') {
-            ctx.beginPath();
-            ctx.moveTo(chX - 14, chY);
-            ctx.lineTo(chX + 14, chY);
-            ctx.moveTo(chX, chY - 14);
-            ctx.lineTo(chX, chY + 14);
-            ctx.stroke();
+          // Animated AutoCAD Crosshair Cursor (+) with Pickbox (stops after 10s)
+          if (!isSettled) {
+            const targetBay = bays[activeBay];
+            const chX = targetBay.x + targetBay.w / 2 + Math.sin(t * 3.8) * 14;
+            const chY = targetBay.y + 42 + Math.cos(t * 3.8) * 10;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.1;
+            if (typeof ctx.beginPath === 'function') {
+              ctx.beginPath();
+              ctx.moveTo(chX - 14, chY);
+              ctx.lineTo(chX + 14, chY);
+              ctx.moveTo(chX, chY - 14);
+              ctx.lineTo(chX, chY + 14);
+              ctx.stroke();
+            }
+            ctx.strokeStyle = '#facc15';
+            ctx.strokeRect(chX - 4, chY - 4, 8, 8);
           }
-          ctx.strokeStyle = '#facc15';
-          ctx.strokeRect(chX - 4, chY - 4, 8, 8);
 
           ctx.restore();
 
           // Bottom AutoCAD Command Line Bar
-          drawPill(cadX + 4, cadY + cadH - 24, cadW - 8, 20, 8, '#1e293b', null, 0);
+          drawPill(cadX + 4, cadY + cadH - 25, cadW - 8, 21, 8, '#1e293b', null, 0);
           ctx.fillStyle = '#38bdf8';
-          ctx.font = '800 8.5px "Consolas", "Prompt", monospace';
-          ctx.textAlign = 'left';
-          const activeCodeStr = bays[activeBay].code;
-          ctx.fillText(`Command: _TEXT Manual Code ➔ ${activeCodeStr}`, cadX + 12, cadY + cadH - 11);
+          const activeCodeStr = isSettled ? '3/3 Completed' : bays[activeBay].code;
+          app.fillFittedText(ctx, `Command: _TEXT Manual Code ➔ ${activeCodeStr}`, cadX + 10, cadY + cadH - 10.5, cadW - 20, 11, '800', '"Consolas", "Prompt", monospace', 'left');
         }
 
         // Right Side inside Hub 2: Typography (x=870..1054, center x=962)
@@ -1750,10 +1743,10 @@
         ctx.fillText('2D Assembly DWG.', rightCx, 906);
         ctx.fillText('Manual Code', rightCx, 940);
 
-        drawPill(rightCx - 74, 958, 148, 28, 14, 'rgba(24, 48, 39, 0.12)', '#2b8a6e', 1.4);
-        ctx.font = '800 12.5px "Prompt", sans-serif';
+        drawPill(rightCx - 88, 956, 176, 32, 16, 'rgba(24, 48, 39, 0.12)', '#2b8a6e', 1.4);
+        ctx.font = '800 15.5px "Prompt", sans-serif';
         ctx.fillStyle = '#14532d';
-        ctx.fillText('● Manual DWG Input', rightCx, 976);
+        ctx.fillText('● Manual DWG Input', rightCx, 977);
 
         ctx.restore();
       });
@@ -1773,13 +1766,13 @@
     if (sStreamA > 0) {
       drawScaled(1180, Y_A, sStreamA, () => {
         ctx.save();
-        ctx.font = '700 14px "Prompt", sans-serif';
+        ctx.font = '700 17px "Prompt", sans-serif';
         ctx.fillStyle = '#e2f1ea';
         ctx.textAlign = 'left';
-        ctx.fillText('Create IM     Create MPS     Create PS', 1108, 310);
+        ctx.fillText('Create IM   Create MPS   Create PS', 1108, 308);
 
         drawPill(1108, Y_A - 32, 148, 64, 14, '#e0eee6', '#8dd4c2', 2.2);
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 20px "Prompt", sans-serif';
         ctx.fillStyle = '#142922';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1805,7 +1798,7 @@
 
         drawPill(1346, Y_A - 32, 260, 64, 14, '#ffffff', '#ff9557', 2.5);
         ctx.save();
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.font = '800 20px "Prompt", sans-serif';
         ctx.fillStyle = '#1b2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1814,11 +1807,8 @@
 
         drawPill(1346, Y_A + 44, 260, 56, 14, '#e0eee6', '#8dd4c2', 2.2);
         ctx.save();
-        ctx.font = '700 16px "Prompt", sans-serif';
         ctx.fillStyle = '#162e26';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Purchase / Supplier / Supply', 1476, Y_A + 72);
+        app.fillFittedText(ctx, 'Purchase / Supplier / Supply', 1476, Y_A + 72 + 6, 244, 18.5, '700', '"Prompt", sans-serif', 'center');
         ctx.restore();
       });
     }
@@ -1844,11 +1834,8 @@
       drawScaled(1196, Y_C, sStreamC, () => {
         drawPill(1108, Y_C - 32, 176, 64, 14, '#e0eee6', '#8dd4c2', 2.2);
         ctx.save();
-        ctx.font = '800 16.5px "Prompt", sans-serif';
         ctx.fillStyle = '#142922';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Smart Board - List', 1196, Y_C);
+        app.fillFittedText(ctx, 'Smart Board - List', 1196, Y_C + 6, 162, 19, '800', '"Prompt", sans-serif', 'center');
         ctx.restore();
       });
 
@@ -1858,15 +1845,15 @@
       drawScaled(1442, Y_C, sStreamC, () => {
         drawPill(1362, Y_C - 56, 160, 112, 16, '#ffffff', '#ff9557', 2.5);
         ctx.save();
-        ctx.font = '700 15.5px "Prompt", sans-serif';
+        ctx.font = '700 17.5px "Prompt", sans-serif';
         ctx.fillStyle = '#1b2423';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Smart Board', 1442, Y_C - 26);
-        ctx.font = '800 18px "Prompt", sans-serif';
+        ctx.fillText('Smart Board', 1442, Y_C - 28);
+        ctx.font = '800 20px "Prompt", sans-serif';
         ctx.fillText('Punching', 1442, Y_C + 1);
-        ctx.font = '700 15.5px "Prompt", sans-serif';
-        ctx.fillText('Code DWG', 1442, Y_C + 28);
+        ctx.font = '700 17.5px "Prompt", sans-serif';
+        ctx.fillText('Code DWG', 1442, Y_C + 30);
         ctx.restore();
       });
 
@@ -1875,14 +1862,11 @@
       drawScaled(1628, Y_C, sStreamC, () => {
         drawPill(1548, Y_C - 56, 160, 112, 16, '#8dd4c2', '#2b8a6e', 2.2);
         ctx.save();
-        ctx.font = '700 14.5px "Prompt", sans-serif';
         ctx.fillStyle = '#142922';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('(Lantex)', 1628, Y_C - 32);
-        ctx.fillText('Cutting / Punching', 1628, Y_C - 10);
-        ctx.fillText('Smart Board', 1628, Y_C + 12);
-        ctx.fillText('Machine', 1628, Y_C + 34);
+        app.fillFittedText(ctx, '(Lantex)', 1628, Y_C - 27, 146, 16.5, '700', '"Prompt", sans-serif', 'center');
+        app.fillFittedText(ctx, 'Cutting / Punching', 1628, Y_C - 4, 146, 16.5, '700', '"Prompt", sans-serif', 'center');
+        app.fillFittedText(ctx, 'Smart Board', 1628, Y_C + 19, 146, 16.5, '700', '"Prompt", sans-serif', 'center');
+        app.fillFittedText(ctx, 'Machine', 1628, Y_C + 42, 146, 16.5, '700', '"Prompt", sans-serif', 'center');
         ctx.restore();
       });
     }
@@ -1916,8 +1900,8 @@
       });
     }
 
-    // 12. ACTIVE FLOW ENERGY PARTICLES (Continuous Loop when t >= 5.0s — all orthogonal)
-    if (t >= 5.0) {
+    // 12. ACTIVE FLOW ENERGY PARTICLES (Runs during 5.0s -> 10.0s, then stops cleanly to prevent viewer fatigue)
+    if (t >= 5.0 && !isSettled) {
       drawArrowPulse(208, 686,   246, 686,   0.0);
       drawArrowPulse(246, Y_BOM, 328, Y_BOM, 0.15);
       drawArrowPulse(246, Y_DWG, 328, Y_DWG, 0.15);
@@ -1939,7 +1923,7 @@
 
   function drawSlide4ExistingDetailScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
 
     // Helper functions
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
@@ -2181,12 +2165,12 @@
         tags.forEach((tag, idx) => {
           const tP = popScale((t - 2.2 - idx * 0.1) / 0.35);
           if (tP > 0) {
-            drawScaled(940 + 135 / 2, (400 + idx * 60) + 40 / 2, tP, () => {
-              drawPill(940, 400 + idx * 60, 135, 40, 10, 'rgba(20, 50, 42, 0.75)', '#85dcc9', 1.5);
+            drawScaled(940 + 140 / 2, (400 + idx * 60) + 42 / 2, tP, () => {
+              drawPill(940, 400 + idx * 60, 140, 42, 10, 'rgba(20, 50, 42, 0.75)', '#85dcc9', 1.5);
               ctx.fillStyle = '#ffffff';
-              ctx.font = '800 17px "Prompt", sans-serif';
+              ctx.font = '800 19px "Prompt", sans-serif';
               ctx.textAlign = 'center';
-              ctx.fillText(tag, 940 + 135 / 2, 400 + idx * 60 + 26);
+              ctx.fillText(tag, 940 + 140 / 2, 400 + idx * 60 + 27);
               ctx.textAlign = 'start';
             });
           }
@@ -2211,10 +2195,10 @@
             drawPill(810, 685, 265, 64, 32, '#9ab8f7', 'rgba(255, 255, 255, 0.6)', 1.5);
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.font = '800 18px "Prompt", sans-serif';
+            ctx.font = '800 20px "Prompt", sans-serif';
             ctx.fillText('Export', 810 + 265 / 2, 685 + 28);
             ctx.font = '900 22px "Prompt", sans-serif';
-            ctx.fillText('Error & Data', 810 + 265 / 2, 685 + 52);
+            ctx.fillText('Error & Data', 810 + 265 / 2, 685 + 54);
             ctx.textAlign = 'start';
           });
         }
@@ -2262,21 +2246,21 @@
           }
         });
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '800 9.5px "Prompt", sans-serif';
+        ctx.font = '800 11.5px "Prompt", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('FILE UPLOAD · EXCEL BOM DATA', clip3X + 50, clip3Y + 17);
+        ctx.fillText('FILE UPLOAD · EXCEL BOM DATA', clip3X + 46, clip3Y + 18);
 
-        // Pulsing LIVE indicator
-        const s3Pulse = 0.5 + 0.5 * Math.sin(t * 5.2);
+        // Pulsing LIVE indicator (settles to steady DONE after 10s)
+        const s3Pulse = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 5.2));
         if (typeof ctx.beginPath === 'function') {
           ctx.beginPath();
-          ctx.arc(clip3X + clip3W - 38, clip3Y + 14, 3.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(34, 197, 94, ${0.65 + 0.35 * s3Pulse})`;
+          ctx.arc(clip3X + clip3W - 46, clip3Y + 14, 3.6, 0, Math.PI * 2);
+          ctx.fillStyle = isSettled ? '#22c55e' : `rgba(34, 197, 94, ${0.65 + 0.35 * s3Pulse})`;
           ctx.fill();
         }
         ctx.fillStyle = '#86efac';
-        ctx.font = '800 8.5px "Prompt", sans-serif';
-        ctx.fillText('LIVE', clip3X + clip3W - 30, clip3Y + 17);
+        ctx.font = '800 10.5px "Prompt", sans-serif';
+        ctx.fillText(isSettled ? 'DONE' : 'LIVE', clip3X + clip3W - 38, clip3Y + 18);
 
         let drewCustomVideo3 = false;
         if (s && s.station3VideoSrc && typeof document !== 'undefined') {
@@ -2311,7 +2295,7 @@
           }
 
           // Animated cycle across 4 steps: 0=Top Size, 1=Opening Type, 2=Size, 3=Excel Upload
-          const s3Step = (t * 0.85) % 4;
+          const s3Step = isSettled ? 3 : ((t * 0.85) % 4);
           const activeCol3 = Math.floor(s3Step);
 
           // Column 1: Top Size
@@ -2321,15 +2305,11 @@
           drawPill(c1X, c1Y, c1W, 178, 4, '#f8fafc', activeCol3 === 0 ? '#2563eb' : '#cbd5e1', activeCol3 === 0 ? 1.5 : 1);
           drawPill(c1X + 2, c1Y + 2, c1W - 4, 15, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Top Size', c1X + c1W / 2, c1Y + 12);
+          app.fillFittedText(ctx, 'Top Size', c1X + c1W / 2, c1Y + 12.5, c1W - 6, 9.5, '800', '"Prompt", sans-serif', 'center');
           drawPill(c1X + 2, c1Y + 19, c1W - 4, 14, 2, '#ffffff', '#94a3b8', 0.8);
           ctx.fillStyle = '#0f172a';
-          ctx.font = '700 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Hi', c1X + 6, c1Y + 29);
-          ctx.fillText('▾', c1X + c1W - 10, c1Y + 29);
+          app.fillFittedText(ctx, 'Hi', c1X + 5, c1Y + 29, c1W - 18, 9.5, '700', '"Prompt", sans-serif', 'left');
+          ctx.fillText('▾', c1X + c1W - 11, c1Y + 29);
           const col1Items = ['Round', 'Hi', 'C4', 'Hi', 'T1', 'C2', 'T2', 'N/A', 'Hi-2'];
           col1Items.forEach((it, idx) => {
             const iy = c1Y + 36 + idx * 15;
@@ -2338,8 +2318,7 @@
               drawPill(c1X + 2, iy, c1W - 4, 14, 2, activeCol3 === 0 ? '#1d4ed8' : '#2563eb', null, 0);
             }
             ctx.fillStyle = isSel ? '#ffffff' : '#475569';
-            ctx.font = `${isSel ? '800' : '600'} 7.2px "Prompt", sans-serif`;
-            ctx.fillText(it, c1X + 6, iy + 10);
+            app.fillFittedText(ctx, it, c1X + 5, iy + 10, c1W - 10, 9.5, isSel ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Column 2: Opening Type
@@ -2349,15 +2328,11 @@
           drawPill(c2X, c2Y, c2W, 178, 4, '#f8fafc', activeCol3 === 1 ? '#2563eb' : '#cbd5e1', activeCol3 === 1 ? 1.5 : 1);
           drawPill(c2X + 2, c2Y + 2, c2W - 4, 15, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Opening Type', c2X + c2W / 2, c2Y + 12);
+          app.fillFittedText(ctx, 'Opening Type', c2X + c2W / 2, c2Y + 12.5, c2W - 6, 9.5, '800', '"Prompt", sans-serif', 'center');
           drawPill(c2X + 2, c2Y + 19, c2W - 4, 14, 2, '#ffffff', '#94a3b8', 0.8);
           ctx.fillStyle = '#0f172a';
-          ctx.font = '700 7.2px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Full Wall', c2X + 5, c2Y + 29);
-          ctx.fillText('▾', c2X + c2W - 10, c2Y + 29);
+          app.fillFittedText(ctx, 'Full Wall', c2X + 4, c2Y + 29, c2W - 16, 9.5, '700', '"Prompt", sans-serif', 'left');
+          ctx.fillText('▾', c2X + c2W - 11, c2Y + 29);
           const col2Items = ['N/A', 'Full Wall', 'D-2', 'W-2', 'W-Double', 'W-Sash', 'D-3.25M', 'Bay-1', 'Wall-2'];
           col2Items.forEach((it, idx) => {
             const iy = c2Y + 36 + idx * 15;
@@ -2366,8 +2341,7 @@
               drawPill(c2X + 2, iy, c2W - 4, 14, 2, activeCol3 === 1 ? '#1d4ed8' : '#2563eb', null, 0);
             }
             ctx.fillStyle = isSel ? '#ffffff' : '#475569';
-            ctx.font = `${isSel ? '800' : '600'} 7px "Prompt", sans-serif`;
-            ctx.fillText(it, c2X + 5, iy + 10);
+            app.fillFittedText(ctx, it, c2X + 4, iy + 10, c2W - 8, 9.5, isSel ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Column 3: Size
@@ -2377,15 +2351,11 @@
           drawPill(c3X, c3Y, c3W, 178, 4, '#f8fafc', activeCol3 === 2 ? '#2563eb' : '#cbd5e1', activeCol3 === 2 ? 1.5 : 1);
           drawPill(c3X + 2, c3Y + 2, c3W - 4, 15, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Size', c3X + c3W / 2, c3Y + 12);
+          app.fillFittedText(ctx, 'Size', c3X + c3W / 2, c3Y + 12.5, c3W - 6, 9.5, '800', '"Prompt", sans-serif', 'center');
           drawPill(c3X + 2, c3Y + 19, c3W - 4, 14, 2, '#ffffff', '#94a3b8', 0.8);
           ctx.fillStyle = '#0f172a';
-          ctx.font = '700 7.2px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('2700', c3X + 5, c3Y + 29);
-          ctx.fillText('▾', c3X + c3W - 9, c3Y + 29);
+          app.fillFittedText(ctx, '2700', c3X + 4, c3Y + 29, c3W - 15, 9.5, '700', '"Prompt", sans-serif', 'left');
+          ctx.fillText('▾', c3X + c3W - 10, c3Y + 29);
           const col3Items = ['3600', '1200', '450', '300', '600', '900', '1800', '2700', '5400'];
           col3Items.forEach((it, idx) => {
             const iy = c3Y + 36 + idx * 15;
@@ -2394,8 +2364,7 @@
               drawPill(c3X + 2, iy, c3W - 4, 14, 2, activeCol3 === 2 ? '#1d4ed8' : '#2563eb', null, 0);
             }
             ctx.fillStyle = isSel ? '#ffffff' : '#475569';
-            ctx.font = `${isSel ? '800' : '600'} 7px "Prompt", sans-serif`;
-            ctx.fillText(it, c3X + 5, iy + 10);
+            app.fillFittedText(ctx, it, c3X + 4, iy + 10, c3W - 8, 9.5, isSel ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Column 4: Excel BOM Sheet Table + Excel Badge
@@ -2405,12 +2374,10 @@
           drawPill(exX, exY, exW, 178, 4, '#ffffff', activeCol3 === 3 ? '#16a34a' : '#cbd5e1', activeCol3 === 3 ? 1.6 : 1);
           drawPill(exX + 2, exY + 2, exW - 4, 15, 2, '#dcfce7', null, 0);
           ctx.fillStyle = '#166534';
-          ctx.font = '800 7.2px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Size (Inner)', exX + 6, exY + 12);
-          ctx.fillText('Position', exX + 58, exY + 12);
+          app.fillFittedText(ctx, 'Size (Inner)', exX + 5, exY + 12.5, 50, 9, '800', '"Prompt", sans-serif', 'left');
+          app.fillFittedText(ctx, 'Position', exX + 58, exY + 12.5, 42, 9, '800', '"Prompt", sans-serif', 'left');
 
-          const scanRow3 = Math.floor((t * 2.6) % 9);
+          const scanRow3 = isSettled ? -1 : Math.floor((t * 2.6) % 9);
           const exRows = [
             ['04-07-02', 'A  4  -  A  8', 'C'],
             ['04-07-02', 'A  8  -  B  8', 'C'],
@@ -2436,15 +2403,13 @@
               0.7
             );
             ctx.fillStyle = isRowActive ? '#14532d' : '#334155';
-            ctx.font = `${isRowActive ? '800' : '600'} 6.8px "Prompt", sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.fillText(r[0], exX + 5, ry + 10.5);
-            ctx.fillText(r[1], exX + 50, ry + 10.5);
-            ctx.fillText(r[2], exX + exW - 16, ry + 10.5);
+            app.fillFittedText(ctx, r[0], exX + 5, ry + 11, 44, 9, isRowActive ? '800' : '600', '"Prompt", sans-serif', 'left');
+            app.fillFittedText(ctx, r[1], exX + 52, ry + 11, Math.max(36, exW - 72), 9, isRowActive ? '800' : '600', '"Prompt", sans-serif', 'left');
+            app.fillFittedText(ctx, r[2], exX + exW - 14, ry + 11, 14, 9, isRowActive ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
-          // Floating Excel Logo Badge (top-right of table, matching reference image)
-          const badgeBounce = Math.sin(t * 4.2) * 2;
+          // Floating Excel Logo Badge (top-right of table, stops floating after 10s)
+          const badgeBounce = isSettled ? 0 : Math.sin(t * 4.2) * 2;
           const bx = exX + exW - 52;
           const by = exY + 6 + badgeBounce;
           drawPill(bx, by, 48, 42, 6, '#ffffff', '#15803d', 1.5);
@@ -2461,56 +2426,56 @@
           ctx.textAlign = 'center';
           ctx.fillText('X', bx + 15, by + 27);
 
-          // Animated Mouse Cursor moving across the 4 targets
-          const targets3 = [
-            { x: c1X + 32, y: c1Y + 58 },
-            { x: c2X + 42, y: c2Y + 58 },
-            { x: c3X + 26, y: c3Y + 148 },
-            { x: bx + 24, y: by + 24 },
-          ];
-          const tIdx3 = Math.floor(s3Step) % 4;
-          const tNext3 = (tIdx3 + 1) % 4;
-          const frac3 = s3Step - Math.floor(s3Step);
-          const moveP3 = clamp(frac3 / 0.55, 0, 1);
-          const cur3X = targets3[tIdx3].x + (targets3[tNext3].x - targets3[tIdx3].x) * moveP3;
-          const cur3Y = targets3[tIdx3].y + (targets3[tNext3].y - targets3[tIdx3].y) * moveP3;
+          // Animated Mouse Cursor moving across the 4 targets (stops & hides cleanly after 10s)
+          if (!isSettled) {
+            const targets3 = [
+              { x: c1X + 32, y: c1Y + 58 },
+              { x: c2X + 42, y: c2Y + 58 },
+              { x: c3X + 26, y: c3Y + 148 },
+              { x: bx + 24, y: by + 24 },
+            ];
+            const tIdx3 = Math.floor(s3Step) % 4;
+            const tNext3 = (tIdx3 + 1) % 4;
+            const frac3 = s3Step - Math.floor(s3Step);
+            const moveP3 = clamp(frac3 / 0.55, 0, 1);
+            const cur3X = targets3[tIdx3].x + (targets3[tNext3].x - targets3[tIdx3].x) * moveP3;
+            const cur3Y = targets3[tIdx3].y + (targets3[tNext3].y - targets3[tIdx3].y) * moveP3;
 
-          if (frac3 > 0.58 && typeof ctx.beginPath === 'function') {
-            const rip3 = (frac3 - 0.58) / 0.42;
-            ctx.beginPath();
-            ctx.arc(targets3[tNext3].x, targets3[tNext3].y, 4 + rip3 * 13, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(37, 99, 235, ${1 - rip3})`;
-            ctx.lineWidth = 1.8;
-            ctx.stroke();
-          }
-          if (typeof ctx.beginPath === 'function') {
-            ctx.beginPath();
-            ctx.moveTo(cur3X, cur3Y);
-            ctx.lineTo(cur3X + 12, cur3Y + 5);
-            ctx.lineTo(cur3X + 7, cur3Y + 8);
-            ctx.lineTo(cur3X + 10, cur3Y + 14);
-            ctx.lineTo(cur3X + 7, cur3Y + 15);
-            ctx.lineTo(cur3X + 4, cur3Y + 9);
-            ctx.lineTo(cur3X, cur3Y + 13);
-            ctx.closePath();
-            ctx.fillStyle = '#0f172a';
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
+            if (frac3 > 0.58 && typeof ctx.beginPath === 'function') {
+              const rip3 = (frac3 - 0.58) / 0.42;
+              ctx.beginPath();
+              ctx.arc(targets3[tNext3].x, targets3[tNext3].y, 4 + rip3 * 13, 0, Math.PI * 2);
+              ctx.strokeStyle = `rgba(37, 99, 235, ${1 - rip3})`;
+              ctx.lineWidth = 1.8;
+              ctx.stroke();
+            }
+            if (typeof ctx.beginPath === 'function') {
+              ctx.beginPath();
+              ctx.moveTo(cur3X, cur3Y);
+              ctx.lineTo(cur3X + 12, cur3Y + 5);
+              ctx.lineTo(cur3X + 7, cur3Y + 8);
+              ctx.lineTo(cur3X + 10, cur3Y + 14);
+              ctx.lineTo(cur3X + 7, cur3Y + 15);
+              ctx.lineTo(cur3X + 4, cur3Y + 9);
+              ctx.lineTo(cur3X, cur3Y + 13);
+              ctx.closePath();
+              ctx.fillStyle = '#0f172a';
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+            }
           }
 
           ctx.restore();
 
           // Bottom Status Bar inside Clip 3
           drawPill(clip3X + 3, clip3Y + clip3H - 23, clip3W - 6, 20, 8, '#0f172a', null, 0);
-          const progW3 = Math.round(((t * 45) % 100) * 1.15);
-          drawPill(clip3X + 8, clip3Y + clip3H - 18, 115, 10, 5, '#1e293b', null, 0);
+          const progW3 = isSettled ? 105 : Math.round(((t * 45) % 100) * 1.05);
+          drawPill(clip3X + 8, clip3Y + clip3H - 18, 105, 10, 5, '#1e293b', null, 0);
           drawPill(clip3X + 8, clip3Y + clip3H - 18, Math.max(18, progW3), 10, 5, '#22c55e', null, 0);
           ctx.fillStyle = '#86efac';
-          ctx.font = '800 8.5px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Uploading BOM_Data.xlsx ➔ Web System', clip3X + 130, clip3Y + clip3H - 10);
+          app.fillFittedText(ctx, isSettled ? 'Uploaded BOM_Data.xlsx ✓' : 'Uploading BOM_Data.xlsx ➔ Web System', clip3X + 120, clip3Y + clip3H - 9.5, clip3W - 128, 10.5, '800', '"Prompt", sans-serif', 'left');
         }
 
         // Pure Vector Typography
@@ -2585,21 +2550,21 @@
           }
         });
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '800 9.5px "Prompt", sans-serif';
+        ctx.font = '800 11.5px "Prompt", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('RECHECK MATRIX · FINAL BOM LIST', clip4X + 50, clip4Y + 17);
+        ctx.fillText('RECHECK MATRIX · FINAL BOM LIST', clip4X + 46, clip4Y + 18);
 
-        // Pulsing LIVE indicator
-        const s4Pulse = 0.5 + 0.5 * Math.sin(t * 5.2 + 1.2);
+        // Pulsing LIVE indicator (settles cleanly after 10s)
+        const s4Pulse = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 5.2 + 1.2));
         if (typeof ctx.beginPath === 'function') {
           ctx.beginPath();
-          ctx.arc(clip4X + clip4W - 38, clip4Y + 14, 3.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(34, 197, 94, ${0.65 + 0.35 * s4Pulse})`;
+          ctx.arc(clip4X + clip4W - 46, clip4Y + 14, 3.6, 0, Math.PI * 2);
+          ctx.fillStyle = isSettled ? '#22c55e' : `rgba(34, 197, 94, ${0.65 + 0.35 * s4Pulse})`;
           ctx.fill();
         }
         ctx.fillStyle = '#86efac';
-        ctx.font = '800 8.5px "Prompt", sans-serif';
-        ctx.fillText('LIVE', clip4X + clip4W - 30, clip4Y + 17);
+        ctx.font = '800 10.5px "Prompt", sans-serif';
+        ctx.fillText(isSettled ? 'DONE' : 'LIVE', clip4X + clip4W - 38, clip4Y + 18);
 
         let drewCustomVideo4 = false;
         if (s && s.station4VideoSrc && typeof document !== 'undefined') {
@@ -2659,7 +2624,7 @@
             { checks: [false, true, true, true], ok: false },
             { checks: [true, true, true, true], ok: true },
           ];
-          const activeRuleIdx = Math.min(3, Math.floor(((t * 1.15) % 4.8)));
+          const activeRuleIdx = isSettled ? 3 : Math.min(3, Math.floor(((t * 1.15) % 4.8)));
 
           ruleRows.forEach((row, rIdx) => {
             const ry = matY + 10 + rIdx * 20;
@@ -2681,16 +2646,16 @@
             // Black arrow on Row 3 (or currently scanned row)
             if (rIdx === 3 || isScanning) {
               ctx.fillStyle = rIdx === 3 ? '#0f172a' : '#64748b';
-              ctx.font = '900 11px "Prompt", sans-serif';
+              ctx.font = '900 13px "Prompt", sans-serif';
               ctx.textAlign = 'left';
-              ctx.fillText('➔', clip4X + 14, ry + 4);
+              ctx.fillText('➔', clip4X + 12, ry + 4.5);
             }
 
             row.checks.forEach((isOk, cIdx) => {
               const cx = colCentersX[cIdx];
               if (typeof ctx.beginPath === 'function') {
                 ctx.beginPath();
-                ctx.arc(cx, ry, 7, 0, Math.PI * 2);
+                ctx.arc(cx, ry, 7.5, 0, Math.PI * 2);
                 ctx.fillStyle = isOk ? '#dcfce7' : '#fee2e2';
                 ctx.fill();
                 ctx.strokeStyle = isOk ? '#16a34a' : '#ef4444';
@@ -2698,21 +2663,21 @@
                 ctx.stroke();
               }
               ctx.fillStyle = isOk ? '#15803d' : '#dc2626';
-              ctx.font = '900 8.5px "Prompt", sans-serif';
+              ctx.font = '900 10.5px "Prompt", sans-serif';
               ctx.textAlign = 'center';
-              ctx.fillText(isOk ? '✓' : '✕', cx, ry + 3);
+              ctx.fillText(isOk ? '✓' : '✕', cx, ry + 3.5);
             });
 
             // Equals sign
             ctx.fillStyle = '#334155';
-            ctx.font = '900 10px "Prompt", sans-serif';
+            ctx.font = '900 12.5px "Prompt", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('=', clip4X + 300, ry + 3.5);
+            ctx.fillText('=', clip4X + 300, ry + 4);
 
             // Result icon
             if (typeof ctx.beginPath === 'function') {
               ctx.beginPath();
-              ctx.arc(resCenterX, ry, 7.5, 0, Math.PI * 2);
+              ctx.arc(resCenterX, ry, 8, 0, Math.PI * 2);
               ctx.fillStyle = row.ok ? '#22c55e' : '#fee2e2';
               ctx.fill();
               ctx.strokeStyle = row.ok ? '#15803d' : '#ef4444';
@@ -2720,9 +2685,9 @@
               ctx.stroke();
             }
             ctx.fillStyle = row.ok ? '#ffffff' : '#dc2626';
-            ctx.font = '900 9px "Prompt", sans-serif';
+            ctx.font = '900 11px "Prompt", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(row.ok ? '✓' : '✕', resCenterX, ry + 3);
+            ctx.fillText(row.ok ? '✓' : '✕', resCenterX, ry + 3.5);
           });
 
           // Bottom Half: 4 Parameter Columns matching the 4 Matrix Columns
@@ -2735,18 +2700,14 @@
           drawPill(p1X, pTopY, p1W, pBoxH, 4, '#f8fafc', '#94a3b8', 1);
           drawPill(p1X + 2, pTopY + 2, p1W - 4, 13, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 6.8px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Window Type', p1X + p1W / 2, pTopY + 11);
+          app.fillFittedText(ctx, 'Window Type', p1X + p1W / 2, pTopY + 11.5, p1W - 6, 9, '800', '"Prompt", sans-serif', 'center');
           const p1Items = ['Tostem WE ▾', 'Windsor', 'Single Glass', 'Double Glass', 'Tostem WE'];
           p1Items.forEach((it, idx) => {
             const iy = pTopY + 17 + idx * 15;
             const isSel = idx === 4;
             if (isSel) drawPill(p1X + 2, iy, p1W - 4, 14, 2, '#2563eb', null, 0);
             ctx.fillStyle = isSel ? '#ffffff' : '#334155';
-            ctx.font = `${isSel || idx === 0 ? '800' : '600'} 6.5px "Prompt", sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.fillText(it, p1X + 5, iy + 10);
+            app.fillFittedText(ctx, it, p1X + 4, iy + 10.5, p1W - 8, 9, (isSel || idx === 0) ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Param 2: Bottom Size
@@ -2755,18 +2716,14 @@
           drawPill(p2X, pTopY, p2W, pBoxH, 4, '#f8fafc', '#94a3b8', 1);
           drawPill(p2X + 2, pTopY + 2, p2W - 4, 13, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 6.8px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Bottom Size', p2X + p2W / 2, pTopY + 11);
+          app.fillFittedText(ctx, 'Bottom Size', p2X + p2W / 2, pTopY + 11.5, p2W - 6, 9, '800', '"Prompt", sans-serif', 'center');
           const p2Items = ['Kitchen ▾', 'N/A', 'F1+800', 'Kitchen', 'Up Beam'];
           p2Items.forEach((it, idx) => {
             const iy = pTopY + 17 + idx * 15;
             const isSel = idx === 3;
             if (isSel) drawPill(p2X + 2, iy, p2W - 4, 14, 2, '#2563eb', null, 0);
             ctx.fillStyle = isSel ? '#ffffff' : '#334155';
-            ctx.font = `${isSel || idx === 0 ? '800' : '600'} 6.5px "Prompt", sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.fillText(it, p2X + 5, iy + 10);
+            app.fillFittedText(ctx, it, p2X + 4, iy + 10.5, p2W - 8, 9, (isSel || idx === 0) ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Param 3: Top Size
@@ -2775,18 +2732,14 @@
           drawPill(p3X, pTopY, p3W, pBoxH, 4, '#f8fafc', '#94a3b8', 1);
           drawPill(p3X + 2, pTopY + 2, p3W - 4, 13, 2, '#e2e8f0', null, 0);
           ctx.fillStyle = '#1e293b';
-          ctx.font = '800 6.8px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Top Size', p3X + p3W / 2, pTopY + 11);
+          app.fillFittedText(ctx, 'Top Size', p3X + p3W / 2, pTopY + 11.5, p3W - 6, 9, '800', '"Prompt", sans-serif', 'center');
           const p3Items = ['Hi ▾', 'Round', 'Hi', 'C4', 'T1'];
           p3Items.forEach((it, idx) => {
             const iy = pTopY + 17 + idx * 15;
             const isSel = idx === 2;
             if (isSel) drawPill(p3X + 2, iy, p3W - 4, 14, 2, '#2563eb', null, 0);
             ctx.fillStyle = isSel ? '#ffffff' : '#334155';
-            ctx.font = `${isSel || idx === 0 ? '800' : '600'} 6.5px "Prompt", sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.fillText(it, p3X + 5, iy + 10);
+            app.fillFittedText(ctx, it, p3X + 4, iy + 10.5, p3W - 8, 9, (isSel || idx === 0) ? '800' : '600', '"Prompt", sans-serif', 'left');
           });
 
           // Param 4: Wide | Frame Type Table
@@ -2795,19 +2748,16 @@
           drawPill(p4X, pTopY, p4W, pBoxH, 4, '#ffffff', '#16a34a', 1.2);
           drawPill(p4X + 2, pTopY + 2, p4W - 4, 13, 2, '#dcfce7', null, 0);
           ctx.fillStyle = '#166534';
-          ctx.font = '800 6.5px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Wide', p4X + 6, pTopY + 11);
-          ctx.fillText('Frame Type', p4X + 34, pTopY + 11);
-          const p4Scan = Math.floor((t * 2.4) % 5);
+          app.fillFittedText(ctx, 'Wide', p4X + 5, pTopY + 11.5, 24, 9, '800', '"Prompt", sans-serif', 'left');
+          app.fillFittedText(ctx, 'Frame Type', p4X + 32, pTopY + 11.5, Math.max(40, p4W - 36), 9, '800', '"Prompt", sans-serif', 'left');
+          const p4Scan = isSettled ? -1 : Math.floor((t * 2.4) % 5);
           for (let r = 0; r < 5; r++) {
             const iy = pTopY + 17 + r * 15;
             const isR = r === p4Scan;
             drawPill(p4X + 2, iy, p4W - 4, 14, 2, isR ? 'rgba(34, 197, 94, 0.22)' : '#f8fafc', null, 0);
             ctx.fillStyle = isR ? '#14532d' : '#334155';
-            ctx.font = `${isR ? '800' : '600'} 6.5px "Prompt", sans-serif`;
-            ctx.fillText('3', p4X + 10, iy + 10);
-            ctx.fillText('F   -   F', p4X + 38, iy + 10);
+            app.fillFittedText(ctx, '3', p4X + 10, iy + 10.5, 16, 9, isR ? '800' : '600', '"Prompt", sans-serif', 'left');
+            app.fillFittedText(ctx, 'F  -  F', p4X + 36, iy + 10.5, Math.max(36, p4W - 40), 9, isR ? '800' : '600', '"Prompt", sans-serif', 'left');
           }
 
           ctx.restore();
@@ -2817,23 +2767,19 @@
           const isMatchedNow = activeRuleIdx === 3;
           drawPill(
             clip4X + 8,
-            clip4Y + clip4H - 19,
-            78,
-            12,
-            6,
+            clip4Y + clip4H - 20,
+            82,
+            14,
+            7,
             isMatchedNow ? '#16a34a' : '#d97706',
             null,
             0
           );
           ctx.fillStyle = '#ffffff';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(isMatchedNow ? 'MATCHED ✓' : `CHECK #${activeRuleIdx + 1}`, clip4X + 47, clip4Y + clip4H - 10.5);
+          app.fillFittedText(ctx, isMatchedNow ? 'MATCHED ✓' : `CHECK #${activeRuleIdx + 1}`, clip4X + 49, clip4Y + clip4H - 10, 74, 9.5, '800', '"Prompt", sans-serif', 'center');
 
           ctx.fillStyle = '#86efac';
-          ctx.font = '800 8.5px "Prompt", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('Rule Verified ➔ Generate Final BOM Excel', clip4X + 94, clip4Y + clip4H - 10);
+          app.fillFittedText(ctx, 'Rule Verified ➔ Generate Final BOM Excel', clip4X + 96, clip4Y + clip4H - 9.5, clip4W - 104, 10.5, '800', '"Prompt", sans-serif', 'left');
         }
 
         // Pure Vector Typography
@@ -2918,8 +2864,8 @@
       }
       drawPill(badgeX, badgeY, badgeW, badgeH, 22, gradBadge || '#ff9557', 'rgba(255, 255, 255, 0.4)', 1.5);
 
-      // Pulsing LED dot
-      const ledPulse = Math.sin(t * 5) * 0.35 + 0.65;
+      // Pulsing LED dot (settles steady after 10s)
+      const ledPulse = isSettled ? 1 : (Math.sin(t * 5) * 0.35 + 0.65);
       ctx.save();
       ctx.fillStyle = `rgba(255, 255, 255, ${ledPulse})`;
       if (typeof ctx.beginPath === 'function' && typeof ctx.arc === 'function') {
@@ -2931,9 +2877,7 @@
 
       // Badge Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 16px "Prompt", sans-serif';
-      ctx.textAlign = 'start';
-      ctx.fillText('WORKFLOW', badgeX + 34, badgeY + 28);
+      app.fillFittedText(ctx, 'WORKFLOW', badgeX + 76, badgeY + 29, 118, 18.5, '900', '"Prompt", sans-serif', 'center');
 
       // 8.3 Main Title: Existing Menu Select BOM on WEB
       ctx.fillStyle = '#ffffff';
@@ -2954,7 +2898,7 @@
       ctx.restore();
 
       // 8.4 Four Connected Process Stage Chips + 4 Live Clips Directly Below Each Chip
-      const activeStageIdx = Math.floor((t * 0.7) % 4);
+      const activeStageIdx = isSettled ? -1 : Math.floor((t * 0.7) % 4);
       const stages = [
         { label: '01 Coding Manual', w: 236, icon: 'ICON/Interior/CODE.png', tag: 'DWG MARKUP · CODE' },
         { label: '02 Web Input / Data', w: 236, icon: 'ICON/Interior/Manaul Tab-IW.png', tag: 'MENU SELECT · IM/MPS' },
@@ -2986,13 +2930,13 @@
         // Accent bullet
         ctx.save();
         ctx.fillStyle = isStageAct ? '#bbff6c' : '#85dcc9';
-        ctx.font = '900 18px "Prompt", sans-serif';
-        ctx.fillText('•', chipX + 14, chipY + 26);
+        ctx.font = '900 16px "Prompt", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('•', chipX + 10, chipY + 26);
 
         // Chip label
         ctx.fillStyle = '#ffffff';
-        ctx.font = '800 16px "Prompt", sans-serif';
-        ctx.fillText(st.label, chipX + 30, chipY + 27);
+        app.fillFittedText(ctx, st.label, chipX + 24, chipY + 27, st.w - 32, 17.5, '800', '"Prompt", sans-serif', 'left');
         ctx.restore();
 
         chipX += st.w + 12;
@@ -3001,7 +2945,7 @@
         if (idx < stages.length - 1) {
           ctx.save();
           ctx.fillStyle = '#ff9557';
-          ctx.font = '900 18px "Prompt", sans-serif';
+          ctx.font = '900 20px "Prompt", sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('❯', chipX - 3, runnerY + 41);
           ctx.restore();
@@ -3021,8 +2965,8 @@
       ctx.fillText('➔', arrowCx, arrowCy + 7);
       ctx.textAlign = 'start';
 
-      // 8.6 Continuous Living Energy Pulse (Sliding across the pipeline)
-      if (t >= 4.8) {
+      // 8.6 Living Energy Pulse (runs 4.8s -> 10.0s, then stops cleanly)
+      if (t >= 4.8 && !isSettled) {
         ctx.save();
         const loopT = ((t - 4.8) % 2.5) / 2.5;
         const pStartX = runnerX + 668;
@@ -3054,11 +2998,9 @@
       const leftCardX = runnerX;
       const leftCardW = 648;
       drawPill(leftCardX, clipRowY, leftCardW, clipRowH, 16, 'rgba(12, 34, 27, 0.88)', 'rgba(133, 220, 201, 0.45)', 1.6);
-      drawPill(leftCardX + 2, clipRowY + 2, leftCardW - 4, 24, 14, '#1e293b', null, 0);
+      drawPill(leftCardX + 2, clipRowY + 2, leftCardW - 4, 26, 14, '#1e293b', null, 0);
       ctx.fillStyle = '#85dcc9';
-      ctx.font = '800 10.5px "Prompt", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('SCG HEIM · INTERIOR & BOM AUTOMATION TOOLKIT ICONS (LIVE PIPELINE)', leftCardX + 14, clipRowY + 18);
+      app.fillFittedText(ctx, 'SCG HEIM · INTERIOR & BOM AUTOMATION TOOLKIT ICONS (LIVE PIPELINE)', leftCardX + 14, clipRowY + 19, leftCardW - 28, 13.5, '800', '"Prompt", sans-serif', 'left');
 
       const pluginIcons = [
         { src: 'ICON/Interior/all-process-interior.png', lbl: 'All Process' },
@@ -3070,7 +3012,7 @@
         { src: 'ICON/Interior/Punching - Gen2D-SB.png', lbl: 'Punch 2D' },
         { src: 'ICON/Interior/uploaddb.png', lbl: 'Upload DB' }
       ];
-      const activeIconIdx = Math.floor((t * 1.6) % pluginIcons.length);
+      const activeIconIdx = isSettled ? -1 : Math.floor((t * 1.6) % pluginIcons.length);
       pluginIcons.forEach((ic, iIdx) => {
         const ix = leftCardX + 14 + iIdx * 78;
         const iy = clipRowY + 36;
@@ -3090,14 +3032,10 @@
           ctx.drawImage(icImg, ix + 11, iy + 8, 48, 48);
         }
         ctx.fillStyle = isIcAct ? '#ffffff' : '#1e293b';
-        ctx.font = '800 9px "Prompt", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(ic.lbl, ix + 35, iy + 76);
+        app.fillFittedText(ctx, ic.lbl, ix + 35, iy + 78, 64, 12, '800', '"Prompt", sans-serif', 'center');
       });
       ctx.fillStyle = '#cbd5e1';
-      ctx.font = '700 11px "Prompt", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('▶ เปรียบเทียบขั้นตอน Manual เดิม (01–04 ด้านขวา) ก่อนยกระดับสู่ระบบ Plug-in อัตโนมัติ', leftCardX + 16, clipRowY + clipRowH - 14);
+      app.fillFittedText(ctx, '▶ เปรียบเทียบขั้นตอน Manual เดิม (01–04 ด้านขวา) ก่อนยกระดับสู่ระบบ Plug-in อัตโนมัติ', leftCardX + 16, clipRowY + clipRowH - 13, leftCardW - 32, 14, '700', '"Prompt", sans-serif', 'left');
 
       // 4 Live Animated Stage Clips directly under 01, 02, 03, 04
       stagePositions.forEach((sp) => {
@@ -3143,20 +3081,18 @@
           }
         });
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '800 8.5px "Prompt", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(sp.st.tag, cx + 40, cy + 16);
+        app.fillFittedText(ctx, sp.st.tag, cx + 38, cy + 16.5, cw - 92, 10.5, '800', '"Prompt", sans-serif', 'left');
 
         // LIVE dot
         if (typeof ctx.beginPath === 'function') {
           ctx.beginPath();
-          ctx.arc(cx + cw - 30, cy + 13, 3, 0, Math.PI * 2);
+          ctx.arc(cx + cw - 38, cy + 13, 3, 0, Math.PI * 2);
           ctx.fillStyle = '#22c55e';
           ctx.fill();
         }
         ctx.fillStyle = '#86efac';
-        ctx.font = '800 7.5px "Prompt", sans-serif';
-        ctx.fillText('LIVE', cx + cw - 24, cy + 16);
+        ctx.font = '800 9.5px "Prompt", sans-serif';
+        ctx.fillText(isSettled ? 'DONE' : 'LIVE', cx + cw - 32, cy + 16.5);
 
         // Body content per stage (0, 1, 2, 3)
         const bx = cx + 6;
@@ -3172,8 +3108,8 @@
           } else {
             drawPill(bx, by, bw - 58, bh, 6, '#f1f5f9', '#cbd5e1', 1);
           }
-          // Animated scanning box over floorplan
-          const scan01 = (t * 0.9) % 3;
+          // Animated scanning box over floorplan (stops cleanly at 10s)
+          const scan01 = isSettled ? 0 : ((t * 0.9) % 3);
           const spots01 = [
             { x: bx + 14, y: by + 18, code: 'ST-12B' },
             { x: bx + 68, y: by + 48, code: 'FT-24A' },
@@ -3183,25 +3119,23 @@
           ctx.strokeStyle = '#ef4444';
           ctx.lineWidth = 2;
           ctx.strokeRect(curSpot.x, curSpot.y, 44, 22);
-          drawPill(curSpot.x, curSpot.y - 14, 48, 13, 3, '#dc2626', null, 0);
+          drawPill(curSpot.x, curSpot.y - 16, 54, 15, 3, '#dc2626', null, 0);
           ctx.fillStyle = '#ffffff';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
+          ctx.font = '800 10px "Prompt", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(curSpot.code, curSpot.x + 24, curSpot.y - 4.5);
+          ctx.fillText(curSpot.code, curSpot.x + 27, curSpot.y - 4.5);
 
           // Right icon badge from ICON/Interior/CODE.png
           drawPill(bx + bw - 54, by, 54, bh, 6, '#f8fafc', '#cbd5e1', 1);
           const icCode = getImage('ICON/Interior/CODE.png');
           if (icCode && icCode.complete && icCode.naturalWidth && typeof ctx.drawImage === 'function') {
-            ctx.drawImage(icCode, bx + bw - 48, by + 8, 42, 42);
+            ctx.drawImage(icCode, bx + bw - 48, by + 6, 42, 42);
           }
           ctx.fillStyle = '#0f172a';
-          ctx.font = '800 7.5px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Manual', bx + bw - 27, by + 66);
-          ctx.fillText('Coding', bx + bw - 27, by + 77);
+          app.fillFittedText(ctx, 'Manual', bx + bw - 27, by + 64, 50, 10, '800', '"Prompt", sans-serif', 'center');
+          app.fillFittedText(ctx, 'Coding', bx + bw - 27, by + 77, 50, 10, '800', '"Prompt", sans-serif', 'center');
           ctx.fillStyle = '#16a34a';
-          ctx.fillText(curSpot.code, bx + bw - 27, by + 94);
+          app.fillFittedText(ctx, curSpot.code, bx + bw - 27, by + 95, 50, 10, '800', '"Prompt", sans-serif', 'center');
         } else if (sp.idx === 1) {
           // 02 Web Input / Data Clip: Menu 1/2/3 + Create IM/MPS/PS + Manaul Tab-IW icon
           drawPill(bx, by, bw, bh, 6, '#f8fafc', '#cbd5e1', 1);
@@ -3210,15 +3144,13 @@
             ctx.drawImage(icTab, bx + 4, by + 4, 68, 22);
           }
           const mRows = ['Menu 1: Wall ST/FT', 'Menu 2: Grid A1-B1', 'Menu 3: Win Hi-K900'];
-          const actM = Math.floor((t * 1.5) % 3);
+          const actM = isSettled ? 0 : Math.floor((t * 1.5) % 3);
           mRows.forEach((mr, mi) => {
             const my = by + 30 + mi * 22;
             const isM = mi === actM;
             drawPill(bx + 4, my, 134, 18, 4, isM ? '#2563eb' : '#ffffff', '#cbd5e1', 0.8);
             ctx.fillStyle = isM ? '#ffffff' : '#334155';
-            ctx.font = '700 7.5px "Prompt", sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(mr, bx + 9, my + 12);
+            app.fillFittedText(ctx, mr, bx + 8, my + 12.5, 126, 10, '700', '"Prompt", sans-serif', 'left');
           });
           const btns2 = ['Create IM', 'Create MPS', 'Create PS'];
           btns2.forEach((bt, bi) => {
@@ -3226,9 +3158,7 @@
             const isB = bi === actM;
             drawPill(bx + 144, by2, 74, 18, 5, isB ? '#16a34a' : '#1e3a2f', null, 0);
             ctx.fillStyle = '#ffffff';
-            ctx.font = '800 7.5px "Prompt", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(bt, bx + 181, by2 + 12);
+            app.fillFittedText(ctx, bt, bx + 181, by2 + 12.5, 68, 10, '800', '"Prompt", sans-serif', 'center');
           });
         } else if (sp.idx === 2) {
           // 03 Upload BOM Data Clip: Excel table rows + csvfileup.png & uploaddb.png
@@ -3239,24 +3169,20 @@
             '04-07-02 | C1-D1 | PS',
             '04-07-02 | D1-E1 | BOM'
           ];
-          const actU = Math.floor((t * 2.2) % 4);
+          const actU = isSettled ? 3 : Math.floor((t * 2.2) % 4);
           uRows.forEach((ur, ui) => {
             const uy = by + 6 + ui * 23;
             const isU = ui === actU;
             drawPill(bx + 4, uy, 146, 19, 4, isU ? '#dcfce7' : '#ffffff', isU ? '#16a34a' : '#e2e8f0', 0.9);
             ctx.fillStyle = isU ? '#166534' : '#334155';
-            ctx.font = '700 7.5px "Consolas", "Prompt", sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(ur, bx + 8, uy + 12.5);
+            app.fillFittedText(ctx, ur, bx + 7, uy + 13, 140, 10, '700', '"Consolas", "Prompt", sans-serif', 'left');
           });
           const icUp = getImage('ICON/Interior/csvfileup.png');
           if (icUp && icUp.complete && icUp.naturalWidth && typeof ctx.drawImage === 'function') {
             ctx.drawImage(icUp, bx + 160, by + 10, 52, 52);
           }
           ctx.fillStyle = '#15803d';
-          ctx.font = '800 8px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('CSV Upload', bx + 186, by + 78);
+          app.fillFittedText(ctx, 'CSV Upload', bx + 186, by + 80, 62, 10.5, '800', '"Prompt", sans-serif', 'center');
         } else {
           // 04 Final BOM Data Clip: Recheck matrix + csvfilecheck.png & all-process-interior.png
           drawPill(bx, by, bw, bh, 6, '#f8fafc', '#cbd5e1', 1);
@@ -3266,39 +3192,33 @@
             { txt: 'Rule 3: Top Size Hi', ok: true },
             { txt: 'Result: BOM Verified ✓', ok: true }
           ];
-          const actC = Math.floor((t * 1.8) % 4);
+          const actC = isSettled ? 3 : Math.floor((t * 1.8) % 4);
           chkRows.forEach((cr, ci) => {
             const cy2 = by + 6 + ci * 23;
             const isC = ci === actC;
             drawPill(bx + 4, cy2, 146, 19, 4, isC ? '#dcfce7' : '#ffffff', '#16a34a', isC ? 1.3 : 0.7);
             ctx.fillStyle = '#15803d';
-            ctx.font = '800 7.5px "Prompt", sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText('✓ ' + cr.txt, bx + 8, cy2 + 12.5);
+            app.fillFittedText(ctx, '✓ ' + cr.txt, bx + 7, cy2 + 13, 140, 10, '800', '"Prompt", sans-serif', 'left');
           });
           const icChk = getImage('ICON/Interior/csvfilecheck.png');
           if (icChk && icChk.complete && icChk.naturalWidth && typeof ctx.drawImage === 'function') {
             ctx.drawImage(icChk, bx + 160, by + 10, 52, 52);
           }
           ctx.fillStyle = '#15803d';
-          ctx.font = '800 8px "Prompt", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Final BOM OK', bx + 186, by + 78);
+          app.fillFittedText(ctx, 'Final BOM OK', bx + 186, by + 80, 62, 10.5, '800', '"Prompt", sans-serif', 'center');
         }
 
         // Bottom Status Bar inside each of the 4 stage clips
-        drawPill(cx + 3, cy + ch - 20, cw - 6, 17, 7, '#0f172a', null, 0);
+        drawPill(cx + 3, cy + ch - 20, cw - 6, 18, 7, '#0f172a', null, 0);
         ctx.fillStyle = isAct ? '#bbff6c' : '#85dcc9';
-        ctx.font = '800 8px "Prompt", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`● ${sp.st.label} · Active Simulation`, cx + cw / 2, cy + ch - 8.5);
+        app.fillFittedText(ctx, isSettled ? `● ${sp.st.label} · Ready` : `● ${sp.st.label} · Active Simulation`, cx + cw / 2, cy + ch - 8, cw - 12, 10.5, '800', '"Prompt", sans-serif', 'center');
       });
 
       ctx.restore();
     }
 
-    // Micro pulses along connectors 1->2, 2->3, 3->4
-    if (t >= 4.8) {
+    // Micro pulses along connectors 1->2, 2->3, 3->4 (runs up to 10s, then stops cleanly)
+    if (t >= 4.8 && !isSettled) {
       ctx.save();
       const connT = ((t * 1.5) % 1);
       const connSpots = [
@@ -3635,7 +3555,7 @@
   // ============================================================================
   function drawSlide5BeforeAfterScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
 
@@ -3723,25 +3643,23 @@
 
       // Top Live Clip Header Bar (right half of top edge so it sits cleanly alongside the pill)
       ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-      ctx.fillRect(rBoxX + 412, rBoxY + 2, rBoxW - 414, 24);
-      const s6Pulse = 0.5 + 0.5 * Math.sin(t * 5.4);
+      ctx.fillRect(rBoxX + 418, rBoxY + 2, rBoxW - 420, 24);
+      const s6Pulse = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 5.4));
       if (typeof ctx.beginPath === 'function') {
         ctx.beginPath();
-        ctx.arc(rBoxX + 428, rBoxY + 14, 4.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(34, 197, 94, ${0.65 + 0.35 * s6Pulse})`;
+        ctx.arc(rBoxX + 432, rBoxY + 14, 4.2, 0, Math.PI * 2);
+        ctx.fillStyle = isSettled ? '#22c55e' : `rgba(34, 197, 94, ${0.65 + 0.35 * s6Pulse})`;
         ctx.fill();
       }
       ctx.fillStyle = '#86efac';
-      ctx.font = '800 10.5px "Prompt", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('LIVE CLIP · SKETCHUP 3D + RUBY AUTO-DETECT PART', rBoxX + 440, rBoxY + 18);
+      app.fillFittedText(ctx, isSettled ? 'DONE · SKETCHUP 3D + RUBY AUTO-DETECT PART' : 'LIVE CLIP · SKETCHUP 3D + RUBY AUTO-DETECT PART', rBoxX + 444, rBoxY + 18.5, rBoxW - 454, 12, '800', '"Prompt", sans-serif', 'left');
 
       if (!drewCustomAfterVid6) {
-        const cyc6 = (t * 0.72) % 6; // 6-unit animation cycle
+        const cyc6 = isSettled ? 5.99 : ((t * 0.72) % 6); // 6-unit animation cycle, holds complete at 10s
 
         // 1. Animated Toolbar Highlight (CAD -> 1234 -> TBOX -> Door -> Layer -> CSV -> Check)
         const tbIconsX = [1124, 1154, 1185, 1216, 1245, 1304, 1336];
-        const activeTbIdx = Math.floor((t * 1.8) % tbIconsX.length);
+        const activeTbIdx = isSettled ? 2 : Math.floor((t * 1.8) % tbIconsX.length);
         const tbHx = tbIconsX[activeTbIdx];
         ctx.save();
         ctx.strokeStyle = '#16a34a';
@@ -3751,7 +3669,7 @@
         ctx.strokeRect(tbHx - 13, 439, 26, 26);
         ctx.restore();
 
-        // 2. Sweeping 3D Laser Scan Line across the SketchUp 3D Floorplan
+        // 2. Sweeping 3D Laser Scan Line across the SketchUp 3D Floorplan (hidden once settled)
         const scanProgress = (t * 0.42) % 1;
         const scanY = 475 + scanProgress * 340;
         ctx.save();
@@ -3760,7 +3678,7 @@
           ctx.rect(rBoxX + 6, 470, 535, 360);
           ctx.clip();
         }
-        const scanGrad = typeof ctx.createLinearGradient === 'function'
+        const scanGrad = (!isSettled && typeof ctx.createLinearGradient === 'function')
           ? ctx.createLinearGradient(rBoxX + 10, scanY - 18, rBoxX + 10, scanY + 6)
           : null;
         if (scanGrad) {
@@ -3783,7 +3701,7 @@
         parts3D.forEach((pt) => {
           const isDetected = cyc6 >= pt.step;
           if (!isDetected) return;
-          const pulseP = 0.55 + 0.45 * Math.sin(t * 6);
+          const pulseP = isSettled ? 0.85 : (0.55 + 0.45 * Math.sin(t * 6));
           ctx.save();
           ctx.strokeStyle = pt.ok ? '#16a34a' : `rgba(220, 38, 38, ${0.75 + 0.25 * pulseP})`;
           ctx.fillStyle = pt.ok ? 'rgba(34, 197, 94, 0.14)' : `rgba(239, 68, 68, ${0.18 + 0.12 * pulseP})`;
@@ -3792,13 +3710,13 @@
           ctx.strokeRect(pt.x, pt.y, pt.w, pt.h);
 
           // Tag label above detected 3D part
-          const tagW = pt.ok ? 98 : 136;
+          const tagW = pt.ok ? 118 : 162;
           ctx.fillStyle = pt.ok ? 'rgba(21, 128, 61, 0.92)' : 'rgba(185, 28, 28, 0.95)';
-          ctx.fillRect(pt.x, pt.y - 16, tagW, 15);
+          ctx.fillRect(pt.x, pt.y - 19, tagW, 18);
           ctx.fillStyle = '#ffffff';
-          ctx.font = '800 8.5px "Prompt", sans-serif';
+          ctx.font = '800 10.5px "Prompt", sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText((pt.ok ? '✓ ' : '⚠ ') + pt.code, pt.x + 4, pt.y - 5.5);
+          ctx.fillText((pt.ok ? '✓ ' : '⚠ ') + pt.code, pt.x + 4, pt.y - 6.5);
           ctx.restore();
         });
         ctx.restore();
@@ -3817,11 +3735,11 @@
 
         // Ruby Console Header
         ctx.fillStyle = '#f1f5f9';
-        ctx.fillRect(rcX + 1, rcY + 1, rcW - 2, 22);
+        ctx.fillRect(rcX + 1, rcY + 1, rcW - 2, 24);
         ctx.fillStyle = '#dc2626';
-        ctx.font = '900 10px "Prompt", sans-serif';
+        ctx.font = '900 12.5px "Prompt", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('◆ Ruby Console · Live Scan', rcX + 8, rcY + 15);
+        ctx.fillText(isSettled ? '◆ Ruby Console · Scan Complete' : '◆ Ruby Console · Live Scan', rcX + 8, rcY + 17);
 
         const rubyLines = [
           { txt: '"lefromdb--------------------"', col: '#64748b' },
@@ -3849,7 +3767,9 @@
           { txt: 'nil', col: '#64748b' }
         ];
 
-        const visibleLineCount = Math.min(rubyLines.length, Math.max(4, Math.floor((cyc6 / 4.6) * rubyLines.length)));
+        const visibleLineCount = isSettled
+          ? rubyLines.length
+          : Math.min(rubyLines.length, Math.max(4, Math.floor((cyc6 / 4.6) * rubyLines.length)));
         for (let li = 0; li < visibleLineCount; li++) {
           const ln = rubyLines[li];
           const ly = rcY + 36 + li * 16.2;
@@ -3858,21 +3778,20 @@
             ctx.fillRect(rcX + 4, ly - 11, rcW - 8, 15);
           }
           ctx.fillStyle = ln.col;
-          ctx.font = `${ln.bold ? '800' : '500'} 8.8px "Consolas", "Prompt", monospace`;
-          ctx.fillText(ln.txt, rcX + 8, ly);
+          app.fillFittedText(ctx, ln.txt, rcX + 8, ly, rcW - 14, 11.2, ln.bold ? '800' : '500', '"Consolas", "Prompt", monospace', 'left');
         }
 
-        // Blinking terminal cursor at the bottom of Ruby Console
-        if (Math.sin(t * 7) > 0) {
+        // Blinking terminal cursor at the bottom of Ruby Console (stops after 10s)
+        if (!isSettled && Math.sin(t * 7) > 0) {
           const curY = rcY + 36 + visibleLineCount * 16.2;
           ctx.fillStyle = '#16a34a';
           ctx.fillRect(rcX + 8, curY - 9, 7, 11);
         }
         ctx.restore();
 
-        // 5. Center SketchUp Alert Popup inside 3D Viewport (pulses when cyc6 >= 3.8)
+        // 5. Center SketchUp Alert Popup inside 3D Viewport
         if (cyc6 >= 3.6) {
-          const popPulse = 0.5 + 0.5 * Math.sin(t * 6.5);
+          const popPulse = isSettled ? 0.9 : (0.5 + 0.5 * Math.sin(t * 6.5));
           ctx.save();
           ctx.strokeStyle = `rgba(239, 68, 68, ${0.65 + 0.35 * popPulse})`;
           ctx.lineWidth = 2.5;
@@ -3902,7 +3821,7 @@
     if (pRight > 0) {
       ctx.save();
       ctx.globalAlpha = pRight;
-      const warnPulse = 0.5 + 0.5 * Math.sin(t * 5.8);
+      const warnPulse = isSettled ? 0.85 : (0.5 + 0.5 * Math.sin(t * 5.8));
 
       // Glowing border around the zoomed alert dialog
       ctx.strokeStyle = `rgba(245, 158, 11, ${0.55 + 0.45 * warnPulse})`;
@@ -3911,14 +3830,14 @@
 
       // Top-right LIVE ALERT badge on the dialog title bar
       ctx.fillStyle = '#dc2626';
-      ctx.fillRect(1545, 830, 155, 22);
+      ctx.fillRect(1522, 829, 182, 24);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '800 10.5px "Prompt", sans-serif';
+      ctx.font = '800 12.5px "Prompt", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('⚠ AUTO-DETECTED NO IM', 1622.5, 845);
+      ctx.fillText('⚠ AUTO-DETECTED NO IM', 1613, 845.5);
 
-      // Pulsing highlight ring around the yellow warning triangle (1202, 912)
-      if (typeof ctx.beginPath === 'function') {
+      // Pulsing highlight ring around the yellow warning triangle (hidden once settled)
+      if (!isSettled && typeof ctx.beginPath === 'function') {
         ctx.beginPath();
         ctx.arc(1203, 912, 26 + warnPulse * 5, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(245, 158, 11, ${0.7 - warnPulse * 0.4})`;
@@ -3926,28 +3845,30 @@
         ctx.stroke();
       }
 
-      // Pulsing highlight & animated cursor on the [ OK ] button (1642, 950, 88, 30)
+      // Highlight & animated cursor on the [ OK ] button (cursor hides after 10s)
       ctx.strokeStyle = '#2563eb';
       ctx.lineWidth = 2;
       ctx.strokeRect(1642, 950, 88, 30);
 
-      const cur6X = 1686 + Math.sin(t * 3.2) * 14;
-      const cur6Y = 966 + Math.cos(t * 3.2) * 8;
-      if (typeof ctx.beginPath === 'function') {
-        ctx.beginPath();
-        ctx.moveTo(cur6X, cur6Y);
-        ctx.lineTo(cur6X + 14, cur6Y + 6);
-        ctx.lineTo(cur6X + 8, cur6Y + 9);
-        ctx.lineTo(cur6X + 11, cur6Y + 16);
-        ctx.lineTo(cur6X + 8, cur6Y + 17);
-        ctx.lineTo(cur6X + 5, cur6Y + 10);
-        ctx.lineTo(cur6X, cur6Y + 15);
-        ctx.closePath();
-        ctx.fillStyle = '#0f172a';
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.3;
-        ctx.stroke();
+      if (!isSettled) {
+        const cur6X = 1686 + Math.sin(t * 3.2) * 14;
+        const cur6Y = 966 + Math.cos(t * 3.2) * 8;
+        if (typeof ctx.beginPath === 'function') {
+          ctx.beginPath();
+          ctx.moveTo(cur6X, cur6Y);
+          ctx.lineTo(cur6X + 14, cur6Y + 6);
+          ctx.lineTo(cur6X + 8, cur6Y + 9);
+          ctx.lineTo(cur6X + 11, cur6Y + 16);
+          ctx.lineTo(cur6X + 8, cur6Y + 17);
+          ctx.lineTo(cur6X + 5, cur6Y + 10);
+          ctx.lineTo(cur6X, cur6Y + 15);
+          ctx.closePath();
+          ctx.fillStyle = '#0f172a';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.3;
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
@@ -3961,7 +3882,7 @@
   // ============================================================================
   function drawSlide6WallPartitionScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { t } = getCappedMotion(app);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
 
@@ -4022,7 +3943,7 @@
   // ============================================================================
   function drawSlide7PunchingScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { t } = getCappedMotion(app);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
 
@@ -4088,7 +4009,7 @@
   // ============================================================================
   function drawSlide8DatabaseMgmtScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { t } = getCappedMotion(app);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
 
@@ -4272,10 +4193,8 @@
       '  "NOTATAKI"=>{\'e\'=>0,\'height\'=>2383,\'code\'=>\'ENT\'} }'
     ];
     ctx.fillStyle = '#1e2923';
-    ctx.font = '600 9.5px "Consolas", "JetBrains Mono", monospace';
-    ctx.textAlign = 'left';
     codeLines.forEach((ln, idx) => {
-      ctx.fillText(ln, rx + 20, ry + 44 + idx * 13);
+      app.fillFittedText(ctx, ln, rx + 16, ry + 42 + idx * 16.5, rw - 32, 12.2, '600', '"Consolas", "JetBrains Mono", monospace', 'left');
     });
 
     // Bottom Bold Text: CREATE / NEW Database / to / System
@@ -4301,11 +4220,8 @@
   // ============================================================================
   function drawSlide9AutomateProcessScene(app, s) {
     const ctx = app.ctx;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : (app.slideElapsed || 0);
-    const t = app.v3MotionEnabled !== false
-      ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0, nowSec)
-      : 10;
-    const elapsed = Math.max(0.8, app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0, 1.5) : 10);
+    const { isSettled, t } = getCappedMotion(app);
+    const elapsed = Math.max(0.8, t);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
     function rrect(x, y, w, h, r) {
@@ -4407,8 +4323,8 @@
     if (typeof ctx.beginPath === 'function') ctx.fill();
     else ctx.fillRect(24, 34, 266, 42);
     ctx.fillStyle = pal.titleColor;
-    ctx.font = '700 14px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('BG:', 42, 60);
+    ctx.font = '700 16px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('BG:', 38, 61);
     bgPresets.forEach((p, idx) => {
       const bx = 92 + idx * 32;
       const by = 55;
@@ -4438,9 +4354,9 @@
 
     ctx.globalAlpha = pHead;
     ctx.textAlign = 'left';
-    const pulseDot = 0.55 + 0.45 * Math.sin(t * 4.5);
+    const pulseDot = isSettled ? 1.0 : (0.55 + 0.45 * Math.sin(t * 4.5));
     ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
-    rrect(1440, 35, 246, 40, 20);
+    rrect(1426, 35, 262, 40, 20);
     if (typeof ctx.beginPath === 'function') {
       ctx.fill();
       ctx.strokeStyle = 'rgba(16, 185, 129, 0.55)';
@@ -4449,13 +4365,12 @@
     }
     if (typeof ctx.arc === 'function') {
       ctx.beginPath();
-      ctx.arc(1462, 55, 6, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
+      ctx.arc(1446, 55, 6, 0, Math.PI * 2);
+      ctx.fillStyle = isSettled ? '#10b981' : `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
       ctx.fill();
     }
     ctx.fillStyle = (pal.preset === 'default' || pal.isDark) ? '#6ee7b7' : '#065f46';
-    ctx.font = '700 14px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('LIVE WORKFLOW • GIF 60FPS', 1478, 60);
+    app.fillFittedText(ctx, isSettled ? 'AUTOMATED · STEP 01-06 OK' : 'LIVE WORKFLOW • GIF 60FPS', 1460, 61, 218, 16, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
     ctx.restore();
 
     drawPageBadge(ctx, app);
@@ -4507,12 +4422,12 @@
     }
     ctx.restore();
 
-    // Animation Cycle Timers (60fps living workflow!)
-    const activeIWStep = Math.floor(t / 2.2) % 6;
-    const iwStepProgress = (t / 2.2) % 1;
-    const activeIWTool = Math.floor((t * 2.2) % 9);
-    const activePTTool = Math.floor((t * 2.0 + 3) % 11);
-    const activePRule = Math.floor(t / 2.6) % 4;
+    // Animation Cycle Timers (runs across 0..10s, then settles calmly)
+    const activeIWStep = isSettled ? 5 : Math.min(5, Math.floor(t / 1.65));
+    const iwStepProgress = isSettled ? 1.0 : ((t / 1.65) % 1);
+    const activeIWTool = isSettled ? 7 : Math.floor((t * 2.2) % 9);
+    const activePTTool = isSettled ? -1 : Math.floor((t * 2.0 + 3) % 11);
+    const activePRule = isSettled ? 3 : Math.floor((t / 2.45) % 4);
     const pIW = easeOut((elapsed - 0.1) / 0.4);
     const pMid = easeOut((elapsed - 0.2) / 0.4);
     const pPT = easeOut((elapsed - 0.25) / 0.45);
@@ -4543,14 +4458,11 @@
     const iwStepColors = ['#059669', '#0284c7', '#ea580c', '#10b981', '#16a34a', '#0d9488'];
     const curStepColor = iwStepColors[activeIWStep];
     ctx.fillStyle = curStepColor;
-    rrect(56, 314, 152, 32, 16);
+    rrect(48, 312, 168, 34, 17);
     if (typeof ctx.beginPath === 'function') ctx.fill();
-    else ctx.fillRect(56, 314, 152, 32);
+    else ctx.fillRect(48, 312, 168, 34);
     ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.font = '800 14px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText(`STEP 0${activeIWStep + 1} / 06 LIVE`, 132, 335);
-    ctx.textAlign = 'left';
+    app.fillFittedText(ctx, isSettled ? 'STEP 06 / 06 OK' : `STEP 0${activeIWStep + 1} / 06 LIVE`, 132, 335, 152, 16, '800', '"Prompt", "Segoe UI", sans-serif', 'center');
 
     // 6 Top Step Diagrams (01..06) — Exact aspect-ratio preserved cards with living spotlight!
     const iwCards = [
@@ -4587,7 +4499,7 @@
 
     iwCards.forEach((cd, idx) => {
       const isActive = idx === activeIWStep;
-      const pop = isActive ? (2.5 * Math.sin(iwStepProgress * Math.PI)) : 0;
+      const pop = (isActive && !isSettled) ? (2.5 * Math.sin(iwStepProgress * Math.PI)) : 0;
       const cx = iwStartX + idx * (iwCardW + iwCardGap) - pop * 0.5;
       const cy = iwCardY - pop;
       const cw = iwCardW + pop;
@@ -4608,15 +4520,13 @@
       ctx.restore();
 
       ctx.fillStyle = isActive ? cd.col : '#1e293b';
-      rrect(cx + 8, cy + 8, 96, 22, 6);
+      rrect(cx + 8, cy + 8, 128, 25, 6);
       if (typeof ctx.beginPath === 'function') ctx.fill();
-      else ctx.fillRect(cx + 8, cy + 8, 96, 22);
+      else ctx.fillRect(cx + 8, cy + 8, 128, 25);
       ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.font = '800 11px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText(`${cd.num} ${cd.label}`, cx + 56, cy + 23);
+      app.fillFittedText(ctx, `${cd.num} ${cd.label}`, cx + 72, cy + 25, 118, 13.5, '800', '"Prompt", "Segoe UI", sans-serif', 'center');
 
-      if (isActive && typeof ctx.arc === 'function') {
+      if (isActive && !isSettled && typeof ctx.arc === 'function') {
         ctx.beginPath();
         ctx.arc(cx + cw - 16, cy + 19, 5, 0, Math.PI * 2);
         ctx.fillStyle = '#ef4444';
@@ -4695,7 +4605,7 @@
       borderColor: '#059669',
       borderWidth: 2
     });
-    if (typeof ctx.clip === 'function' && typeof ctx.beginPath === 'function') {
+    if (!isSettled && typeof ctx.clip === 'function' && typeof ctx.beginPath === 'function') {
       ctx.save();
       rrect(isoX + 2, isoY + 2, isoW - 4, isoH - 4, 12);
       ctx.clip();
@@ -4711,15 +4621,13 @@
       ctx.restore();
     }
     ctx.fillStyle = 'rgba(15, 23, 42, 0.84)';
-    rrect(isoX + 8, isoY + 8, 122, 22, 6);
+    rrect(isoX + 8, isoY + 8, 146, 26, 6);
     if (typeof ctx.beginPath === 'function') ctx.fill();
     ctx.fillStyle = '#34d399';
-    ctx.textAlign = 'center';
-    ctx.font = '800 11px "JetBrains Mono", "Prompt", sans-serif';
-    ctx.fillText('▶ 3D GIF BUILD', isoX + 69, isoY + 23);
+    app.fillFittedText(ctx, isSettled ? '✓ 3D AUTO BUILD' : '▶ 3D GIF BUILD', isoX + 81, isoY + 25.5, 134, 13.5, '800', '"JetBrains Mono", "Prompt", sans-serif', 'center');
     ctx.textAlign = 'left';
 
-    // Right 100% Animated Gauges (IW)
+    // Right 100% Animated Gauges (IW — stop stably at 100% after 10s)
     const iwBarXs = [1508, 1632, 1756];
     const iwFillProg = clamp((elapsed - 0.25) / 0.85, 0.2, 1);
     iwBarXs.forEach((bx, bi) => {
@@ -4727,7 +4635,7 @@
       ctx.fillStyle = '#e2e8f0';
       rrect(trackX, trackY, trackW, trackH, 8);
       if (typeof ctx.beginPath === 'function') ctx.fill();
-      const wave = 1 - 0.04 * Math.abs(Math.sin(t * 2.2 + bi * 1.1));
+      const wave = isSettled ? 1 : (1 - 0.04 * Math.abs(Math.sin(t * 2.2 + bi * 1.1)));
       const fh = trackH * iwFillProg * wave;
       ctx.fillStyle = bi === 0 ? '#38bdf8' : (bi === 1 ? '#0ea5e9' : '#10b981');
       rrect(trackX, trackY + trackH - fh, trackW, fh, 6);
@@ -4738,13 +4646,13 @@
       if (typeof ctx.beginPath === 'function') ctx.stroke();
       ctx.fillStyle = stageInk;
       ctx.textAlign = 'center';
-      ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
+      ctx.font = '800 20px "Prompt", "Segoe UI", sans-serif';
       ctx.fillText('100%', trackX + trackW / 2, 456);
     });
     ctx.fillStyle = stageInk;
     ctx.textAlign = 'center';
-    ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Implement (from AUG, 2024)', 1650, 484);
+    ctx.font = '800 20px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Implement (from AUG, 2024)', 1650, 486);
     ctx.textAlign = 'left';
     ctx.restore();
 
@@ -4774,17 +4682,19 @@
       ctx.closePath();
       ctx.fill();
 
-      for (let pk = 0; pk < 6; pk++) {
-        const phase = ((t * 0.48 + pk / 6) % 1);
-        const px = pipeStart + phase * (pipeEnd - 24 - pipeStart);
-        if (typeof ctx.arc === 'function') {
-          ctx.beginPath();
-          ctx.arc(px, pipeY, 5.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#fef08a';
-          ctx.fill();
-          ctx.strokeStyle = '#dc2626';
-          ctx.lineWidth = 1.6;
-          ctx.stroke();
+      if (!isSettled) {
+        for (let pk = 0; pk < 6; pk++) {
+          const phase = ((t * 0.48 + pk / 6) % 1);
+          const px = pipeStart + phase * (pipeEnd - 24 - pipeStart);
+          if (typeof ctx.arc === 'function') {
+            ctx.beginPath();
+            ctx.arc(px, pipeY, 5.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fef08a';
+            ctx.fill();
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+          }
         }
       }
     }
@@ -4792,7 +4702,7 @@
     const outLabels = ['BOM', 'MRP', 'DWG'];
     const outXs = [1526, 1650, 1774];
     outLabels.forEach((lbl, li) => {
-      const pulse = 0.5 + 0.5 * Math.sin(t * 3.8 - li * 0.9);
+      const pulse = isSettled ? 0.7 : (0.5 + 0.5 * Math.sin(t * 3.8 - li * 0.9));
       ctx.fillStyle = `rgba(16, 185, 129, ${(0.12 + 0.14 * pulse).toFixed(2)})`;
       rrect(outXs[li] - 46, 503, 92, 34, 10);
       if (typeof ctx.beginPath === 'function') ctx.fill();
@@ -4900,7 +4810,7 @@
       ctx.fillStyle = '#e2e8f0';
       rrect(trackX, trackY, trackW, trackH, 8);
       if (typeof ctx.beginPath === 'function') ctx.fill();
-      const wave = 1 - 0.04 * Math.abs(Math.cos(t * 2.1 + bi));
+      const wave = isSettled ? 1 : (1 - 0.04 * Math.abs(Math.cos(t * 2.1 + bi)));
       const fh = trackH * ptFillProg * wave;
       ctx.fillStyle = '#38bdf8';
       rrect(trackX, trackY + trackH - fh, trackW, fh, 6);
@@ -4911,13 +4821,13 @@
       if (typeof ctx.beginPath === 'function') ctx.stroke();
       ctx.fillStyle = stageInk;
       ctx.textAlign = 'center';
-      ctx.font = '800 18px "Prompt", "Segoe UI", sans-serif';
+      ctx.font = '800 20px "Prompt", "Segoe UI", sans-serif';
       ctx.fillText('100%', trackX + trackW / 2, 570);
     });
     ctx.fillStyle = stageInk;
     ctx.textAlign = 'center';
-    ctx.font = '800 17px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('Standard P-Rule (Run Test > OK)', 1650, 692);
+    ctx.font = '800 19.5px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('Standard P-Rule (Run Test > OK)', 1650, 694);
     ctx.textAlign = 'left';
 
     // Bottom-Left Green Dashed Box (Standard P-Rule) — Aspect Ratio Preserved + Live Cycle!
@@ -4934,17 +4844,17 @@
     }
 
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 20px "Prompt", "Segoe UI", sans-serif';
+    ctx.font = '800 21px "Prompt", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Standard P-Rule (Run Test > OK)', pBoxX + pBoxW / 2, pBoxY + 30);
 
-    const okPulse = 0.72 + 0.28 * Math.sin(t * 4);
+    const okPulse = isSettled ? 1.0 : (0.72 + 0.28 * Math.sin(t * 4));
     ctx.fillStyle = `rgba(16, 185, 129, ${okPulse.toFixed(2)})`;
-    rrect(pBoxX + pBoxW - 156, pBoxY + 10, 138, 26, 13);
+    rrect(pBoxX + pBoxW - 178, pBoxY + 9, 160, 28, 14);
     if (typeof ctx.beginPath === 'function') ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = '800 12px "Prompt", "Segoe UI", sans-serif';
-    ctx.fillText('RUN TEST > OK ✓', pBoxX + pBoxW - 87, pBoxY + 27);
+    ctx.font = '800 14.5px "Prompt", "Segoe UI", sans-serif';
+    ctx.fillText('RUN TEST > OK ✓', pBoxX + pBoxW - 98, pBoxY + 28);
     ctx.textAlign = 'left';
 
     const pRuleCards = [
@@ -4965,8 +4875,8 @@
       });
       ctx.fillStyle = isPRLit ? (isCardDark ? '#34d399' : '#047857') : stageInk;
       ctx.textAlign = 'center';
-      ctx.font = '800 17px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText(rc.cap, rc.x + rc.w / 2, pBoxY + pBoxH + 24);
+      ctx.font = '800 19.5px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(rc.cap, rc.x + rc.w / 2, pBoxY + pBoxH + 26);
       ctx.textAlign = 'left';
     });
 
@@ -5005,8 +4915,7 @@
   // ============================================================================
   function drawSlide10HolePlugAutomateScene(app, s) {
     const ctx = app.ctx;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : (app.slideElapsed || 0);
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
+    const { isSettled, t } = getCappedMotion(app);
     function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
     function easeOut(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
     function rrect(x, y, w, h, r) {
@@ -5126,7 +5035,7 @@
       ctx.stroke();
     }
     ctx.fillStyle = isLightHeader ? '#0F5E4E' : '#85DCC9';
-    fit('PLUG & SWITCH · AUTO 7 STEPS', 164, 56, 250, 13.5, '800', '"Prompt", sans-serif', 'center');
+    fit('PLUG & SWITCH · AUTO 7 STEPS', 164, 57, 252, 15.5, '800', '"Prompt", sans-serif', 'center');
 
     // Centered Main Title & Subtitle
     ctx.fillStyle = pal.titleColor || '#FFFFFF';
@@ -5134,8 +5043,8 @@
     ctx.fillStyle = isLightHeader ? '#0F5E4E' : '#85DCC9';
     fit('Automate of Hole Plug & Switch_Hood [Interior Wall / Partition]', 960, 77, 940, 20, '600', '"Prompt", "Segoe UI", sans-serif', 'center');
 
-    // Right Status Pill (left of Page Badge)
-    const pulseDot = 0.5 + 0.5 * Math.sin(nowSec * 4.5);
+    // Right Status Pill (left of Page Badge, settles to calm steady emerald after 10s)
+    const pulseDot = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 4.5));
     ctx.fillStyle = isLightHeader ? 'rgba(16, 185, 129, 0.14)' : 'rgba(16, 185, 129, 0.18)';
     rrect(1446, 33, 232, 36, 18);
     if (typeof ctx.beginPath === 'function') {
@@ -5147,11 +5056,11 @@
     if (typeof ctx.arc === 'function') {
       ctx.beginPath();
       ctx.arc(1468, 51, 5.5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
+      ctx.fillStyle = isSettled ? '#10b981' : `rgba(16, 185, 129, ${pulseDot.toFixed(2)})`;
       ctx.fill();
     }
     ctx.fillStyle = isLightHeader ? '#065F46' : '#6EE7B7';
-    fit('LIVE 7-STEP AUTOMATION', 1572, 56, 190, 13, '800', '"Prompt", sans-serif', 'center');
+    fit(isSettled ? '7-STEP AUTOMATION ✓' : 'LIVE 7-STEP AUTOMATION', 1572, 57, 196, 15, '800', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     drawPageBadge(ctx, app);
@@ -5200,12 +5109,10 @@
     ctx.restore();
     ctx.restore();
 
-    // Active spotlight step synced with playback cues (or manual click)
+    // Active spotlight walks #1..#7 across the first 10s, then rests cleanly (manual clicks still work)
     const activeStep = (typeof app._v3HpManualFocus === 'number')
       ? app._v3HpManualFocus
-      : (app.isPlaying
-          ? (t < 14 ? -1 : (t < 32.5 ? Math.floor(((t - 14) / 18.5) * 4) % 4 : (4 + (Math.floor(((t - 32.5) / 17.5) * 3) % 3))))
-          : Math.floor((nowSec / 3.6) % 7));
+      : (isSettled ? -1 : Math.min(6, Math.floor(Math.max(0, t - 0.6) / 1.3)));
 
     // Shared 4-Column Swiss Grid Metrics (x=48..1870 -> total 1822px)
     const colGap = 18;
@@ -5304,10 +5211,10 @@
       });
 
       ctx.fillStyle = isLit ? '#059669' : (isCardDark ? 'rgba(255,255,255,0.12)' : '#E2E8F0');
-      rrect(ix + 11, topY + 82, tileW - 22, 22, 11);
+      rrect(ix + 10, topY + 81, tileW - 20, 24, 12);
       if (typeof ctx.beginPath === 'function') ctx.fill();
       ctx.fillStyle = isLit ? '#FFFFFF' : (isCardDark ? '#E2E8F0' : '#0F172A');
-      fit(ic.n, ix + tileW / 2, topY + 98, 44, 15, '800', '"Prompt", sans-serif', 'center');
+      fit(ic.n, ix + tileW / 2, topY + 99, 46, 17, '800', '"Prompt", sans-serif', 'center');
 
       app._v3HpHits.push({ x: ix, y: topY + 4, w: tileW, h: topH - 8, idx, seekT: ic.seekT });
     });
@@ -5340,7 +5247,7 @@
       borderWidth: activeStep === 6 ? 2.4 : 1.4
     });
     ctx.fillStyle = isCardDark ? '#FCA5A5' : '#991B1B';
-    fit('File Upload', uploadX + 43, topY + 98, 86, 13.5, '800', '"Prompt", sans-serif', 'center');
+    fit('File Upload', uploadX + 43, topY + 100, 92, 16, '800', '"Prompt", sans-serif', 'center');
 
     // 4B. Right Impact Goals Capsule (968..1870, exact same 902 x 114 size)
     const capX = colX(2);
@@ -5373,14 +5280,14 @@
       rrect(capX + 38, gy - 16, 30, 30, 15);
       if (typeof ctx.beginPath === 'function') ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      fit(g.n, capX + 53, gy + 5, 22, 16, '900', '"Prompt", sans-serif', 'center');
-      fit(g.text, capX + 82, gy + 6, 460, 23, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
+      fit(g.n, capX + 53, gy + 6, 24, 18, '900', '"Prompt", sans-serif', 'center');
+      fit(g.text, capX + 82, gy + 7, 456, 24, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
 
       ctx.fillStyle = 'rgba(15, 23, 42, 0.20)';
-      rrect(capX + barW - 292, gy - 15, 250, 28, 14);
+      rrect(capX + barW - 302, gy - 16, 260, 30, 15);
       if (typeof ctx.beginPath === 'function') ctx.fill();
       ctx.fillStyle = '#E0F2FE';
-      fit(g.tag, capX + barW - 167, gy + 4, 232, 13.5, '600', '"Prompt", sans-serif', 'center');
+      fit(g.tag, capX + barW - 172, gy + 5, 244, 15.5, '600', '"Prompt", sans-serif', 'center');
     });
     ctx.restore();
 
@@ -5429,7 +5336,7 @@
           const dx = frameX + (frameW - dw) / 2;
           const dy = frameY + (frameH - dh) / 2;
           ctx.save();
-          ctx.globalAlpha = pMid * (0.75 + 0.25 * Math.sin(nowSec * 3.5));
+          ctx.globalAlpha = isSettled ? pMid : pMid * (0.75 + 0.25 * Math.sin(t * 3.5));
           ctx.strokeStyle = '#EA580C';
           ctx.lineWidth = 2.4;
           ctx.strokeRect(dx + dw * 0.115, dy + dh * 0.055, dw * 0.115, dh * 0.095);
@@ -5460,23 +5367,23 @@
       if (typeof ctx.beginPath === 'function') { ctx.fill(); ctx.stroke(); } else { ctx.fillRect(fx, fy, fw, fh); }
 
       ctx.fillStyle = headerBg;
-      rrect(fx + 2, fy + 2, fw - 4, 24, 9);
+      rrect(fx + 2, fy + 2, fw - 4, 28, 9);
       if (typeof ctx.beginPath === 'function') ctx.fill();
       if (title) {
         ctx.fillStyle = '#334155';
-        fit(title, fx + 10, fy + 18, fw - 112, 11, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
+        fit(title, fx + 10, fy + 20, fw - 120, 14, '700', '"Prompt", "Segoe UI", sans-serif', 'left');
       }
       if (pill) {
-        const pw = centerPill ? Math.min(fw - 20, 96) : 92;
+        const pw = centerPill ? Math.min(fw - 16, 110) : 104;
         const px = centerPill ? fx + (fw - pw) / 2 : fx + fw - pw - 6;
         ctx.fillStyle = pillColor;
-        rrect(px, fy + 5, pw, 18, 6);
+        rrect(px, fy + 5, pw, 21, 6);
         if (typeof ctx.beginPath === 'function') ctx.fill();
         ctx.fillStyle = '#FFFFFF';
-        fit(pill, px + pw / 2, fy + 17.5, pw - 10, 10.5, '700', '"Prompt", sans-serif', 'center');
+        fit(pill, px + pw / 2, fy + 20, pw - 10, 13, '700', '"Prompt", sans-serif', 'center');
       }
       ctx.restore();
-      drawAspectImage(ctx, img, fx + 4, fy + 28, fw - 8, fh - 32, { alpha: pBot, radius: 8, pad: 2 });
+      drawAspectImage(ctx, img, fx + 4, fy + 32, fw - 8, fh - 36, { alpha: pBot, radius: 8, pad: 2 });
     }
 
     // 6A. Card #5: Generate 2D Auto Rotate (x=48..490, aligned under #1!)
@@ -5612,6 +5519,11 @@
     // Step 0: 0..10s (holds for 10s)
     // Step 1: 10..130s (plays 2 minutes / 120s)
     // Step 2: 130..150s (holds for 20s · 5 deliverables x 4s)
+    // Preload Step 02 sequential plugin videos once Slide 12 opens so they are ready without stalling
+    if (v2Slides && v2Slides[1] && Array.isArray(v2Slides[1].videoPlaylist) && typeof app.getOrCreateVideo === 'function') {
+      v2Slides[1].videoPlaylist.forEach((vp) => { if (vp && vp.src) app.getOrCreateVideo(vp.src); });
+    }
+
     if (app.canvas && !app.canvas._v3TabListenerAttached) {
       app.canvas._v3TabListenerAttached = true;
       app.canvas.addEventListener('click', (e) => {
@@ -5621,35 +5533,18 @@
         const cy = (e.clientY - rect.top) * (1080 / rect.height);
         const curSlide = app.slides && app.slides[app.activeSlideIndex];
         if (curSlide && (curSlide.id === 'v3-new-workflow' || curSlide.layout === 'new-workflow-allinone')) {
+          const slideStart = typeof app.getSlideStartTime === 'function' ? app.getSlideStartTime(app.activeSlideIndex) : 0;
+          const jumpSlideElapsed = (targetSec, subStepIdx) => {
+            if (typeof app.seekTo === 'function') app.seekTo(slideStart + targetSec);
+            else app.slideElapsed = targetSec;
+            if (!app.isPlaying) app._ver2SubStep = subStepIdx;
+            if (typeof app.render === 'function') app.render();
+          };
+
           if (cy >= 16 && cy <= 54) {
-            const slideStart = typeof app.getSlideStartTime === 'function' ? app.getSlideStartTime(app.activeSlideIndex) : 0;
-            if (cx >= 475 && cx <= 735) {
-              if (app.isPlaying && typeof app.seekTo === 'function') {
-                app.seekTo(slideStart + 0.1);
-              } else {
-                app._ver2SubStep = 0;
-                if (typeof app.render === 'function') app.render();
-              }
-              return;
-            }
-            if (cx >= 745 && cx <= 1035) {
-              if (app.isPlaying && typeof app.seekTo === 'function') {
-                app.seekTo(slideStart + 10.1);
-              } else {
-                app._ver2SubStep = 1;
-                if (typeof app.render === 'function') app.render();
-              }
-              return;
-            }
-            if (cx >= 1045 && cx <= 1275) {
-              if (app.isPlaying && typeof app.seekTo === 'function') {
-                app.seekTo(slideStart + 130.1);
-              } else {
-                app._ver2SubStep = 2;
-                if (typeof app.render === 'function') app.render();
-              }
-              return;
-            }
+            if (cx >= 475 && cx <= 735) { jumpSlideElapsed(0.1, 0); return; }
+            if (cx >= 745 && cx <= 1035) { jumpSlideElapsed(14.1, 1); return; }
+            if (cx >= 1045 && cx <= 1275) { jumpSlideElapsed(130.1, 2); return; }
             if (cx >= 1310 && cx <= 1510) {
               app.parallelBranchStyle = 'clean-minimal';
               if (typeof app.render === 'function') app.render();
@@ -5659,6 +5554,26 @@
               app.parallelBranchStyle = 'ver2-dark';
               if (typeof app.render === 'function') app.render();
               return;
+            }
+          }
+
+          // Clickable Step 02 Sequential Video Clip Pills ([1 · IW Plugin] / [2 · EE Plugin]) & VDO Monitor Play/Pause
+          if (app._ver2ActiveStep === 1) {
+            if (Array.isArray(app._step2VdoClipHits)) {
+              for (const vh of app._step2VdoClipHits) {
+                if (cx >= vh.x && cx <= vh.x + vh.w && cy >= vh.y && cy <= vh.y + vh.h) {
+                  jumpSlideElapsed(10.0 + vh.stepDelaySec + vh.clipStartSec + 0.08, 1);
+                  return;
+                }
+              }
+            }
+            if (app.vdoMonitorRect) {
+              const vr = app.vdoMonitorRect;
+              if (cx >= vr.x && cx <= vr.x + vr.w && cy >= vr.y && cy <= vr.y + vr.h) {
+                if (app.isPlaying) app.pause();
+                else app.play(false);
+                return;
+              }
             }
           }
         }
@@ -5690,9 +5605,8 @@
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    ctx.fillStyle = '#85dcc9';
-    ctx.font = '800 15px "Prompt", sans-serif';
-    ctx.fillText('01 • NEW WORKFLOW: 4 PARALLEL BRANCHES', lBadgeX + 22, topBarY + 24);
+      ctx.fillStyle = '#85dcc9';
+      app.fillFittedText(ctx, '01 • NEW WORKFLOW: 4 PARALLEL BRANCHES', lBadgeX + lBadgeW / 2, topBarY + 25, lBadgeW - 28, 16.5, '800', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     // Center 3 Horizontal Stepper Tabs (Sleek, low-profile, clean)
@@ -5720,10 +5634,7 @@
       ctx.stroke();
 
       ctx.fillStyle = isAct ? '#0f1714' : '#cbd5e1';
-      ctx.font = isAct ? '800 14px "Prompt", sans-serif' : '600 13.5px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(tab.label, tabStartX + tab.w / 2, topBarY + 24);
-      ctx.textAlign = 'left';
+      app.fillFittedText(ctx, tab.label, tabStartX + tab.w / 2, topBarY + 25, tab.w - 18, isAct ? 15.5 : 15, isAct ? '800' : '600', '"Prompt", sans-serif', 'center');
       ctx.restore();
 
       tabStartX += tab.w + tabGap;
@@ -5749,9 +5660,7 @@
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = isClean ? '#0f1714' : '#e2e8f0';
-      ctx.font = isClean ? '700 12.5px "Prompt", sans-serif' : '500 12.5px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('✨ สไตล์ 1: Clean Minimal', b1X + b1W / 2, topBarY + 23);
+      app.fillFittedText(ctx, '✨ สไตล์ 1: Clean Minimal', b1X + b1W / 2, topBarY + 24.5, b1W - 18, 15, isClean ? '700' : '500', '"Prompt", sans-serif', 'center');
 
       // Ver 2 Dark Button
       ctx.fillStyle = !isClean ? '#10b981' : 'rgba(255, 255, 255, 0.08)';
@@ -5766,9 +5675,7 @@
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = !isClean ? '#0f1714' : '#e2e8f0';
-      ctx.font = !isClean ? '700 12.5px "Prompt", sans-serif' : '500 12.5px "Prompt", sans-serif';
-      ctx.fillText('🌙 สไตล์ 2: Ver 2 Dark', b2X + b2W / 2, topBarY + 23);
-      ctx.textAlign = 'left';
+      app.fillFittedText(ctx, '🌙 สไตล์ 2: Ver 2 Dark', b2X + b2W / 2, topBarY + 24.5, b2W - 18, 15, !isClean ? '700' : '500', '"Prompt", sans-serif', 'center');
       ctx.restore();
     }
 
@@ -5803,6 +5710,14 @@
 
     // 4. Render Active Ver 2 Scene inside full-width stageBox
     app._ver2ActiveStep = activeStep;
+    if (activeStep !== 1 && app.videoCache && v2Slides && v2Slides[1] && Array.isArray(v2Slides[1].videoPlaylist)) {
+      v2Slides[1].videoPlaylist.forEach((vp) => {
+        const cachedVid = vp && vp.src ? app.videoCache.get(vp.src) : null;
+        if (cachedVid && !cachedVid.paused) {
+          try { cachedVid.pause(); } catch (e) {}
+        }
+      });
+    }
     const activeSlide = (v2Slides && v2Slides[activeStep]) ? v2Slides[activeStep] : s;
     if (activeStep === 0) {
       if (typeof app.drawParallelBranchSplitScene === 'function') {
@@ -5824,8 +5739,7 @@
 
   function drawSlide12ProcessImprovementScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+    const { isSettled, t } = getCappedMotion(app);
 
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     function easeOutCubic(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
@@ -5954,8 +5868,8 @@
         drawArrowHead(x2, y2, ang, headSize, color);
       }
 
-      // Animated traveling energy orb along the path
-      if (pulseColor && typeof ctx.arc === 'function') {
+      // Animated traveling energy orb along the path (runs up to 10s, then stops cleanly)
+      if (!isSettled && pulseColor && typeof ctx.arc === 'function') {
         const segs = [];
         let totalLen = 0;
         for (let i = 0; i < pts.length - 1; i++) {
@@ -5966,7 +5880,7 @@
           totalLen += len;
         }
         if (totalLen > 1) {
-          const prog = ((nowSec * (speed || 110)) % totalLen);
+          const prog = ((t * (speed || 110)) % totalLen);
           for (let i = 0; i < segs.length; i++) {
             const sg = segs[i];
             if (prog >= sg.start && prog <= sg.start + sg.len) {
@@ -6113,33 +6027,33 @@
 
     // Top-Right Pill: 7 days ▷ 1 day (Group 123)
     const pill7X = X(1225.5);
-    const pill7Y = Y(16.0);
+    const pill7Y = Y(10.0);
     const pill7W = W(330.0);
-    const pill7H = 44;
-    drawRoundedBox(pill7X, pill7Y, pill7W, pill7H, 22, '#e2e2e2', null, 0);
+    const pill7H = 40;
+    drawRoundedBox(pill7X, pill7Y, pill7W, pill7H, 20, '#e2e2e2', null, 0);
 
     // Orange Pill for "1 day"
     const pill1X = X(1476.0);
     const pill1W = W(108.0);
-    const pulse1 = Math.sin(nowSec * 3.5) * 0.5 + 0.5;
+    const pulse1 = isSettled ? 0.55 : (Math.sin(t * 3.5) * 0.5 + 0.5);
     ctx.save();
     if (pulse1 > 0.1) {
       ctx.shadowColor = 'rgba(255, 149, 87, 0.6)';
       ctx.shadowBlur = 8 + pulse1 * 8;
     }
-    drawRoundedBox(pill1X, pill7Y, pill1W, pill7H, 22, '#f08c4b', null, 0);
+    drawRoundedBox(pill1X, pill7Y, pill1W, pill7H, 20, '#f08c4b', null, 0);
     ctx.restore();
 
     ctx.fillStyle = '#0f172a';
     ctx.font = '700 22px "Prompt", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('7 days', pill7X + W(125), pill7Y + 30);
-    ctx.fillText('1 day', pill1X + pill1W / 2, pill7Y + 30);
+    ctx.fillText('7 days', pill7X + W(125), pill7Y + 28);
+    ctx.fillText('1 day', pill1X + pill1W / 2, pill7Y + 28);
     ctx.textAlign = 'left';
 
     // Hollow Black Triangle Arrow between "7 days" and "1 day"
     const triX = X(1455.0);
-    const triY = pill7Y + 11;
+    const triY = pill7Y + 9;
     if (typeof ctx.beginPath === 'function') {
       ctx.save();
       ctx.strokeStyle = '#0f172a';
@@ -6168,13 +6082,11 @@
     ctx.fillText('Existing Process', X(518.0), Y(172));
 
     // Pill 1: Create DWG & Coding Assembly Part
-    drawRoundedBox(X(385.5), Y(186.0), W(264.5), H(41.0), 20, '#f2eeee', '#ff9557', 2);
+    drawRoundedBox(X(385.5), Y(180.0), W(264.5), H(41.0), 20, '#f2eeee', '#ff9557', 2);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '700 15px "Prompt", sans-serif';
-    ctx.fillText('Create DWG & Coding Assembly Part', X(517.8), Y(204));
+    app.fillFittedText(ctx, 'Create DWG & Coding Assembly Part', X(517.8), Y(197), W(244), 16, '700', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = '#334155';
-    ctx.font = '400 11.5px "Prompt", sans-serif';
-    ctx.fillText('Wall, Partition, Frame, Stud, Smart Board, Window', X(517.8), Y(220));
+    app.fillFittedText(ctx, 'Wall, Partition, Frame, Stud, Smart Board, Window', X(517.8), Y(212), W(244), 13, '400', '"Prompt", sans-serif', 'center');
 
     // Card 01: Manual BOM on DWG
     drawRoundedBox(X(385.5), Y(240.1), W(265.3), H(366.5), 34, '#f2eeee', '#334155', 1.5);
@@ -6207,7 +6119,7 @@
       { x: 530.5, y: 526.1, w: 58.6, h: 22.8, ax: 565.4, ay1: 548.9, ay2: 595.0 }
     ];
     s1Callouts.forEach((c, idx) => {
-      const pulseC = Math.sin(nowSec * 3 + idx) * 0.5 + 0.5;
+      const pulseC = isSettled ? 0.5 : (Math.sin(t * 3 + idx) * 0.5 + 0.5);
       // Green inner oval
       drawRoundedBox(X(c.x + 3), Y(c.y + 2), W(c.w - 6), H(c.h - 4), 10, null, '#16a34a', 1.8);
       // Red dashed outer callout
@@ -6218,13 +6130,11 @@
 
     // Pill 2: Input Data from DWG > to BOM
     ctx.textAlign = 'center';
-    drawRoundedBox(X(384.9), Y(622.8), W(267.6), H(42.2), 21, '#f2eeee', '#ff9557', 2);
+    drawRoundedBox(X(384.9), Y(616.0), W(267.6), H(41.0), 20, '#f2eeee', '#ff9557', 2);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '700 15px "Prompt", sans-serif';
-    ctx.fillText('Input Data from DWG > to BOM', X(518.7), Y(641));
+    app.fillFittedText(ctx, 'Input Data from DWG > to BOM', X(518.7), Y(633), W(246), 16, '700', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = '#334155';
-    ctx.font = '400 11.5px "Prompt", sans-serif';
-    ctx.fillText('Menu Select', X(518.7), Y(657));
+    app.fillFittedText(ctx, 'Menu Select', X(518.7), Y(648), W(246), 13, '400', '"Prompt", sans-serif', 'center');
 
     // Card 02: Input Data (Menu Select) — Live Animated Simulator Clip
     drawRoundedBox(X(384.9), Y(675.7), W(267.6), H(243.5), 36, '#ffffff', '#ff9557', 5.5);
@@ -6259,21 +6169,21 @@
       }
     });
     ctx.fillStyle = '#e2e8f0';
-    ctx.font = '800 8px "Prompt", sans-serif';
+    ctx.font = '800 10px "Prompt", sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('WEB BOM · MENU SELECT INPUT', c2X + 42, c2Y + 14);
+    ctx.fillText('WEB BOM · MENU SELECT INPUT', c2X + 39, c2Y + 14.5);
 
-    // Pulsing LIVE dot
-    const s13Pulse = 0.5 + 0.5 * Math.sin(nowSec * 5.4);
+    // Pulsing LIVE dot (settles calmly to DONE after 10s)
+    const s13Pulse = isSettled ? 1 : (0.5 + 0.5 * Math.sin(t * 5.4));
     if (typeof ctx.beginPath === 'function') {
       ctx.beginPath();
-      ctx.arc(c2X + c2W - 32, c2Y + 11, 3, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(34, 197, 94, ${0.65 + 0.35 * s13Pulse})`;
+      ctx.arc(c2X + c2W - 40, c2Y + 11, 3, 0, Math.PI * 2);
+      ctx.fillStyle = isSettled ? '#22c55e' : `rgba(34, 197, 94, ${0.65 + 0.35 * s13Pulse})`;
       ctx.fill();
     }
     ctx.fillStyle = '#86efac';
-    ctx.font = '800 7.5px "Prompt", sans-serif';
-    ctx.fillText('LIVE', c2X + c2W - 25, c2Y + 14);
+    ctx.font = '800 9.5px "Prompt", sans-serif';
+    ctx.fillText(isSettled ? 'DONE' : 'LIVE', c2X + c2W - 33, c2Y + 14.5);
 
     // 5 Top Menu Tabs inside Clip
     const tab13Labels = [
@@ -6289,13 +6199,11 @@
       const ty = c2Y + 23;
       drawRoundedBox(tx, ty, tab13W - 1, 15, 3, tb.bg, tb.bg === '#2563eb' ? '#1d4ed8' : tb.col, 0.9);
       ctx.fillStyle = tb.col;
-      ctx.font = '800 6.5px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(tb.txt, tx + (tab13W - 1) / 2, ty + 10.5);
+      app.fillFittedText(ctx, tb.txt, tx + (tab13W - 1) / 2, ty + 11, tab13W - 6, 8.5, '800', '"Prompt", sans-serif', 'center');
     });
 
-    // Animated step cycle across the 3 dropdown columns + table
-    const step13 = (nowSec * 0.9) % 4;
+    // Animated step cycle across the 3 dropdown columns + table (settles cleanly at 10s)
+    const step13 = isSettled ? 3 : ((t * 0.9) % 4);
     const actCol13 = Math.floor(step13);
     const body13Y = c2Y + 41;
     const body13H = c2H - 45;
@@ -6304,57 +6212,45 @@
     const d1X = c2X + 6, d1W = 46;
     drawRoundedBox(d1X, body13Y, d1W, body13H, 3, '#ffffff', actCol13 === 0 ? '#2563eb' : '#cbd5e1', actCol13 === 0 ? 1.4 : 0.8);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 6.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Top Size', d1X + d1W / 2, body13Y + 9);
+    app.fillFittedText(ctx, 'Top Size', d1X + d1W / 2, body13Y + 9.5, d1W - 5, 8.5, '800', '"Prompt", sans-serif', 'center');
     drawRoundedBox(d1X + 2, body13Y + 12, d1W - 4, 11, 2, '#f1f5f9', '#94a3b8', 0.6);
-    ctx.textAlign = 'left';
-    ctx.fillText('Hi ▾', d1X + 5, body13Y + 20);
+    app.fillFittedText(ctx, 'Hi ▾', d1X + 4, body13Y + 20, d1W - 8, 8.5, '700', '"Prompt", sans-serif', 'left');
     ['Round', 'Hi', 'C4', 'T1', 'C2', 'T2', 'N/A'].forEach((it, idx) => {
       const iy = body13Y + 26 + idx * 13;
       const isS = idx === 1;
       if (isS) drawRoundedBox(d1X + 2, iy, d1W - 4, 12, 2, '#2563eb', null, 0);
       ctx.fillStyle = isS ? '#ffffff' : '#475569';
-      ctx.font = `${isS ? '800' : '600'} 6.3px "Prompt", sans-serif`;
-      ctx.fillText(it, d1X + 5, iy + 8.5);
+      app.fillFittedText(ctx, it, d1X + 4, iy + 9, d1W - 8, 8.5, isS ? '800' : '600', '"Prompt", sans-serif', 'left');
     });
 
     // Dropdown 2: Opening Type
     const d2X = d1X + d1W + 4, d2W = 64;
     drawRoundedBox(d2X, body13Y, d2W, body13H, 3, '#ffffff', actCol13 === 1 ? '#2563eb' : '#cbd5e1', actCol13 === 1 ? 1.4 : 0.8);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 6.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Opening Type', d2X + d2W / 2, body13Y + 9);
+    app.fillFittedText(ctx, 'Opening Type', d2X + d2W / 2, body13Y + 9.5, d2W - 5, 8.5, '800', '"Prompt", sans-serif', 'center');
     drawRoundedBox(d2X + 2, body13Y + 12, d2W - 4, 11, 2, '#f1f5f9', '#94a3b8', 0.6);
-    ctx.textAlign = 'left';
-    ctx.fillText('Full Wall ▾', d2X + 4, body13Y + 20);
+    app.fillFittedText(ctx, 'Full Wall ▾', d2X + 4, body13Y + 20, d2W - 8, 8.5, '700', '"Prompt", sans-serif', 'left');
     ['N/A', 'Full Wall', 'D-2', 'W-2', 'W-Double', 'W-Sash', 'Bay-1'].forEach((it, idx) => {
       const iy = body13Y + 26 + idx * 13;
       const isS = idx === 1;
       if (isS) drawRoundedBox(d2X + 2, iy, d2W - 4, 12, 2, '#2563eb', null, 0);
       ctx.fillStyle = isS ? '#ffffff' : '#475569';
-      ctx.font = `${isS ? '800' : '600'} 6.2px "Prompt", sans-serif`;
-      ctx.fillText(it, d2X + 4, iy + 8.5);
+      app.fillFittedText(ctx, it, d2X + 4, iy + 9, d2W - 8, 8.5, isS ? '800' : '600', '"Prompt", sans-serif', 'left');
     });
 
     // Dropdown 3: Size
     const d3X = d2X + d2W + 4, d3W = 42;
     drawRoundedBox(d3X, body13Y, d3W, body13H, 3, '#ffffff', actCol13 === 2 ? '#2563eb' : '#cbd5e1', actCol13 === 2 ? 1.4 : 0.8);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 6.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Size', d3X + d3W / 2, body13Y + 9);
+    app.fillFittedText(ctx, 'Size', d3X + d3W / 2, body13Y + 9.5, d3W - 5, 8.5, '800', '"Prompt", sans-serif', 'center');
     drawRoundedBox(d3X + 2, body13Y + 12, d3W - 4, 11, 2, '#f1f5f9', '#94a3b8', 0.6);
-    ctx.textAlign = 'left';
-    ctx.fillText('2700 ▾', d3X + 4, body13Y + 20);
+    app.fillFittedText(ctx, '2700 ▾', d3X + 4, body13Y + 20, d3W - 8, 8.5, '700', '"Prompt", sans-serif', 'left');
     ['300', '450', '600', '900', '1800', '2700', '3600'].forEach((it, idx) => {
       const iy = body13Y + 26 + idx * 13;
       const isS = idx === 5;
       if (isS) drawRoundedBox(d3X + 2, iy, d3W - 4, 12, 2, '#2563eb', null, 0);
       ctx.fillStyle = isS ? '#ffffff' : '#475569';
-      ctx.font = `${isS ? '800' : '600'} 6.2px "Prompt", sans-serif`;
-      ctx.fillText(it, d3X + 4, iy + 8.5);
+      app.fillFittedText(ctx, it, d3X + 4, iy + 9, d3W - 8, 8.5, isS ? '800' : '600', '"Prompt", sans-serif', 'left');
     });
 
     // Right Table: Size (Inner) | Position | Amount + Isometric Sheet Stack + Excel X Badge
@@ -6362,13 +6258,11 @@
     const tb13W = c2X + c2W - tb13X - 6;
     drawRoundedBox(tb13X, body13Y, tb13W, body13H, 3, '#ffffff', actCol13 === 3 ? '#16a34a' : '#cbd5e1', actCol13 === 3 ? 1.4 : 0.8);
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 6.2px "Prompt", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('Size (Inner)', tb13X + 4, body13Y + 9);
-    ctx.fillText('Position', tb13X + 54, body13Y + 9);
-    ctx.fillText('Amount', tb13X + 102, body13Y + 9);
+    app.fillFittedText(ctx, 'Size (Inner)', tb13X + 4, body13Y + 9.5, 42, 7.8, '800', '"Prompt", sans-serif', 'left');
+    app.fillFittedText(ctx, 'Position', tb13X + 48, body13Y + 9.5, 36, 7.8, '800', '"Prompt", sans-serif', 'left');
+    app.fillFittedText(ctx, 'Amount', tb13X + 86, body13Y + 9.5, 32, 7.8, '800', '"Prompt", sans-serif', 'left');
 
-    const scan13Row = Math.floor((nowSec * 2.5) % 7);
+    const scan13Row = isSettled ? -1 : Math.floor((t * 2.5) % 7);
     for (let r = 0; r < 7; r++) {
       const ry = body13Y + 14 + r * 14.5;
       const isActR = r === scan13Row;
@@ -6383,55 +6277,57 @@
         0.6
       );
       ctx.fillStyle = isActR ? '#14532d' : '#334155';
-      ctx.font = `${isActR ? '800' : '600'} 6px "Consolas", "Prompt", sans-serif`;
-      ctx.fillText('04-07-02 ▾', tb13X + 4, ry + 9);
-      ctx.fillText(`A ${r + 1} - B ${r + 1}`, tb13X + 52, ry + 9);
-      ctx.fillText('12', tb13X + 106, ry + 9);
+      app.fillFittedText(ctx, '04-07-02', tb13X + 4, ry + 9.5, 42, 7.8, isActR ? '800' : '600', '"Consolas", "Prompt", sans-serif', 'left');
+      app.fillFittedText(ctx, `A${r + 1}-B${r + 1}`, tb13X + 48, ry + 9.5, 36, 7.8, isActR ? '800' : '600', '"Consolas", "Prompt", sans-serif', 'left');
+      app.fillFittedText(ctx, '12', tb13X + 90, ry + 9.5, 20, 7.8, isActR ? '800' : '600', '"Consolas", "Prompt", sans-serif', 'left');
     }
 
-    // Floating Isometric 3-Sheet Stack + Green Excel Badge on bottom-right of Card 02 Clip
-    drawIsoSpreadsheetStack(c2X + c2W - 64, body13Y + 34 + Math.sin(nowSec * 3.8) * 2);
-    const ex13X = c2X + c2W - 26;
-    const ex13Y = body13Y + 56 + Math.sin(nowSec * 3.8) * 2;
-    drawRoundedBox(ex13X, ex13Y, 22, 24, 4, '#15803d', '#ffffff', 1.2);
+    // Floating Isometric 3-Sheet Stack + Green Excel Badge (tucked cleanly bottom-right clear of data)
+    const isoFloat13 = isSettled ? 0 : Math.sin(t * 3.8) * 2;
+    drawIsoSpreadsheetStack(c2X + c2W - 42, body13Y + 76 + isoFloat13);
+    const ex13X = c2X + c2W - 22;
+    const ex13Y = body13Y + 90 + isoFloat13;
+    drawRoundedBox(ex13X, ex13Y, 20, 22, 4, '#15803d', '#ffffff', 1.2);
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 13px "Prompt", sans-serif';
+    ctx.font = '900 13.5px "Prompt", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('X', ex13X + 11, ex13Y + 17);
+    ctx.fillText('X', ex13X + 10, ex13Y + 16);
 
-    // Animated Mouse Cursor inside Card 02 Clip
-    const cur13Targets = [
-      { x: d1X + 24, y: body13Y + 44 },
-      { x: d2X + 34, y: body13Y + 44 },
-      { x: d3X + 22, y: body13Y + 94 },
-      { x: tb13X + 65, y: body13Y + 58 }
-    ];
-    const t13Idx = actCol13 % 4;
-    const t13Next = (t13Idx + 1) % 4;
-    const frac13 = step13 - Math.floor(step13);
-    const move13P = clamp(frac13 / 0.55, 0, 1);
-    const cur13X = cur13Targets[t13Idx].x + (cur13Targets[t13Next].x - cur13Targets[t13Idx].x) * move13P;
-    const cur13Y = cur13Targets[t13Idx].y + (cur13Targets[t13Next].y - cur13Targets[t13Idx].y) * move13P;
-    if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      ctx.moveTo(cur13X, cur13Y);
-      ctx.lineTo(cur13X + 10, cur13Y + 4);
-      ctx.lineTo(cur13X + 6, cur13Y + 7);
-      ctx.lineTo(cur13X + 8, cur13Y + 12);
-      ctx.lineTo(cur13X + 6, cur13Y + 13);
-      ctx.lineTo(cur13X + 3, cur13Y + 8);
-      ctx.lineTo(cur13X, cur13Y + 11);
-      ctx.closePath();
-      ctx.fillStyle = '#0f172a';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    // Animated Mouse Cursor inside Card 02 Clip (hides after 10s)
+    if (!isSettled) {
+      const cur13Targets = [
+        { x: d1X + 24, y: body13Y + 44 },
+        { x: d2X + 34, y: body13Y + 44 },
+        { x: d3X + 22, y: body13Y + 94 },
+        { x: tb13X + 65, y: body13Y + 58 }
+      ];
+      const t13Idx = actCol13 % 4;
+      const t13Next = (t13Idx + 1) % 4;
+      const frac13 = step13 - Math.floor(step13);
+      const move13P = clamp(frac13 / 0.55, 0, 1);
+      const cur13X = cur13Targets[t13Idx].x + (cur13Targets[t13Next].x - cur13Targets[t13Idx].x) * move13P;
+      const cur13Y = cur13Targets[t13Idx].y + (cur13Targets[t13Next].y - cur13Targets[t13Idx].y) * move13P;
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        ctx.moveTo(cur13X, cur13Y);
+        ctx.lineTo(cur13X + 10, cur13Y + 4);
+        ctx.lineTo(cur13X + 6, cur13Y + 7);
+        ctx.lineTo(cur13X + 8, cur13Y + 12);
+        ctx.lineTo(cur13X + 6, cur13Y + 13);
+        ctx.lineTo(cur13X + 3, cur13Y + 8);
+        ctx.lineTo(cur13X, cur13Y + 11);
+        ctx.closePath();
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
 
     // Bottom Warning inside Card 02: *** High Change of Human Error
     ctx.fillStyle = '#dc2626';
-    ctx.font = '700 13.5px "Prompt", sans-serif';
+    ctx.font = '700 16px "Prompt", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('*** High Change of Human Error', X(518.7), Y(907));
     ctx.textAlign = 'left';
@@ -6447,10 +6343,9 @@
     // Badge 03
     drawRoundedBox(X(431.2), Y(954.0), W(46.0), H(42.0), 9, '#f2eeee', '#ff9557', 2);
     ctx.fillStyle = '#ff9557';
-    ctx.font = '700 17px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('0', X(454.2), Y(972));
-    ctx.fillText('3', X(454.2), Y(990));
+    ctx.fillText('03', X(454.2), Y(982));
     ctx.textAlign = 'left';
 
     // AutoCAD Icon (Bottom-Left)
@@ -6460,25 +6355,25 @@
     }
 
     // Step 03 Labels: Manual Assembly DWG / Manual Plug Switch Smart Board / Manual PO
-    ctx.font = '700 17.5px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.fillStyle = '#ff9557';
     ctx.fillText('Manual', X(616.0), Y(935));
-    ctx.font = '400 17.5px "Prompt", sans-serif';
+    ctx.font = '400 19px "Prompt", sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('Assembly DWG', X(616.0), Y(956));
+    ctx.fillText('Assembly DWG', X(616.0), Y(957));
 
-    ctx.font = '700 17.5px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.fillStyle = '#ff9557';
-    ctx.fillText('Manual', X(616.0), Y(986));
-    ctx.font = '400 17.5px "Prompt", sans-serif';
+    ctx.fillText('Manual', X(616.0), Y(987));
+    ctx.font = '400 19px "Prompt", sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('Plug Switch Smart Board', X(616.0), Y(1007));
+    ctx.fillText('Plug Switch Smart Board', X(616.0), Y(1009));
 
-    ctx.font = '700 17.5px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.fillStyle = '#ff9557';
     ctx.fillText('Manual', X(766.0), Y(935));
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('PO', X(778.0), Y(956));
+    ctx.fillText('PO', X(778.0), Y(957));
 
     ctx.restore();
 
@@ -6526,11 +6421,11 @@
 
     // Text on Layer 5: Sourcing > Vendor / Production > Smart Board Machine > Picking Part to Assembly
     drawIsoText([
-      { text: 'Sourcing', font: '700 18px "Prompt", sans-serif', color: '#ffffff', dx: 0, dy: 0 },
-      { text: '> Vendor', font: '400 14px "Prompt", sans-serif', color: '#e2e8f0', dx: 18, dy: 19 },
-      { text: 'Production', font: '700 18px "Prompt", sans-serif', color: '#ffffff', dx: 44, dy: 52 },
-      { text: '> Smart Board Machine', font: '400 13.5px "Prompt", sans-serif', color: '#e2e8f0', dx: 52, dy: 70 },
-      { text: '> Picking Part to Assembly', font: '400 13.5px "Prompt", sans-serif', color: '#e2e8f0', dx: 56, dy: 86 }
+      { text: 'Sourcing', font: '700 20px "Prompt", sans-serif', color: '#ffffff', dx: 0, dy: 0 },
+      { text: '> Vendor', font: '400 16.5px "Prompt", sans-serif', color: '#e2e8f0', dx: 18, dy: 21 },
+      { text: 'Production', font: '700 20px "Prompt", sans-serif', color: '#ffffff', dx: 44, dy: 54 },
+      { text: '> Smart Board Machine', font: '400 16px "Prompt", sans-serif', color: '#e2e8f0', dx: 52, dy: 74 },
+      { text: '> Picking Part to Assembly', font: '400 16px "Prompt", sans-serif', color: '#e2e8f0', dx: 56, dy: 93 }
     ], 868, 856);
 
     // Layer 4: DWG > Assembly > Detail > Smart Board Cutting Machine
@@ -6539,11 +6434,11 @@
     ];
     drawPoly(poly4, 'rgba(226, 224, 223, 0.90)', '#ff9557', 3.5);
     drawIsoText([
-      { text: 'DWG', font: '700 19px "Prompt", sans-serif', color: '#0f172a', dx: 0, dy: 0 },
-      { text: '> Assembly', font: '500 18px "Prompt", sans-serif', color: '#0f172a', dx: 22, dy: 21 },
-      { text: '> Detail', font: '500 18px "Prompt", sans-serif', color: '#0f172a', dx: 36, dy: 42 },
-      { text: '> Smart Board', font: '500 17px "Prompt", sans-serif', color: '#0f172a', dx: 50, dy: 63 },
-      { text: 'Cutting Machine', font: '700 14.5px "Prompt", sans-serif', color: '#0f172a', dx: 74, dy: 81 }
+      { text: 'DWG', font: '700 21px "Prompt", sans-serif', color: '#0f172a', dx: 0, dy: 0 },
+      { text: '> Assembly', font: '500 19.5px "Prompt", sans-serif', color: '#0f172a', dx: 22, dy: 22 },
+      { text: '> Detail', font: '500 19.5px "Prompt", sans-serif', color: '#0f172a', dx: 36, dy: 44 },
+      { text: '> Smart Board', font: '500 18.5px "Prompt", sans-serif', color: '#0f172a', dx: 50, dy: 66 },
+      { text: 'Cutting Machine', font: '700 16.5px "Prompt", sans-serif', color: '#0f172a', dx: 74, dy: 86 }
     ], 885, 725);
 
     // Layer 3b: Upload New*Data Base (Lower-Right Half-Diamond)
@@ -6552,8 +6447,8 @@
     ];
     drawPoly(poly3b, 'rgba(226, 224, 223, 0.90)', '#ff9557', 3.5);
     drawIsoText([
-      { text: 'Upload', font: '400 16px "Prompt", sans-serif', color: '#1e293b', dx: 0, dy: 0 },
-      { text: 'New*Data Base', font: '700 21px "Prompt", sans-serif', color: '#0f172a', dx: 12, dy: 22 }
+      { text: 'Upload', font: '400 18px "Prompt", sans-serif', color: '#1e293b', dx: 0, dy: 0 },
+      { text: 'New*Data Base', font: '700 22px "Prompt", sans-serif', color: '#0f172a', dx: 12, dy: 24 }
     ], 926, 646);
 
     // Layer 3a: Generate Exiting Data Base (Upper-Left Half-Diamond)
@@ -6562,8 +6457,8 @@
     ];
     drawPoly(poly3a, 'rgba(226, 224, 223, 0.90)', '#ff9557', 3.5);
     drawIsoText([
-      { text: 'Generate Exiting', font: '400 12.5px "Prompt", sans-serif', color: '#1e293b', dx: 0, dy: 0 },
-      { text: 'Data Base', font: '700 22px "Prompt", sans-serif', color: '#0f172a', dx: 4, dy: 22 }
+      { text: 'Generate Exiting', font: '400 15.5px "Prompt", sans-serif', color: '#1e293b', dx: 0, dy: 0 },
+      { text: 'Data Base', font: '700 22.5px "Prompt", sans-serif', color: '#0f172a', dx: 4, dy: 24 }
     ], 858, 576);
 
     // Layer 2: BOM (Translucent Diamond)
@@ -6586,8 +6481,8 @@
 
     // Top-Left Isometric Header: SALE TEAM (Account Executive)
     drawIsoText([
-      { text: 'SALE TEAM', font: '700 22px "Prompt", sans-serif', color: '#0f172a', dx: 0, dy: 0 },
-      { text: '(Account Executive)', font: '700 16px "Prompt", sans-serif', color: '#0f172a', dx: 12, dy: 21 }
+      { text: 'SALE TEAM', font: '700 23px "Prompt", sans-serif', color: '#0f172a', dx: 0, dy: 0 },
+      { text: '(Account Executive)', font: '700 18px "Prompt", sans-serif', color: '#0f172a', dx: 12, dy: 23 }
     ], 790, 224);
 
     // Bottom Tip Label: Customer
@@ -6626,12 +6521,12 @@
     if (imExcel && imExcel.complete && imExcel.naturalWidth) {
       ctx.drawImage(imExcel, X(647.0), Y(812.0), 44, 44);
     }
-    ctx.font = '700 17.5px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.fillStyle = '#ff9557';
-    ctx.fillText('Manual', X(687.0), Y(792));
-    ctx.font = '700 13.5px "Prompt", sans-serif';
+    ctx.fillText('Manual', X(687.0), Y(791));
+    ctx.font = '700 16px "Prompt", sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('CSV. Data Base', X(687.0), Y(811));
+    ctx.fillText('CSV. Data Base', X(687.0), Y(813));
 
     // 6 Orange Downward Triangles (▼ with black borders) connecting the stack
     const stackTriangles = [
@@ -6643,7 +6538,7 @@
       [1065.4, 920.3]
     ];
     stackTriangles.forEach(([tx, ty], idx) => {
-      const bounce = Math.sin(nowSec * 3.2 - idx * 0.6) * 2.5;
+      const bounce = isSettled ? 0 : (Math.sin(t * 3.2 - idx * 0.6) * 2.5);
       drawDownTriangle(X(tx), Y(ty) + bounce, 20, 32, '#ff9557', '#0f172a', 2.8, 0);
     });
 
@@ -6658,7 +6553,7 @@
 
     // Label: Improvement
     ctx.fillStyle = '#bbff6c';
-    ctx.font = '700 18.5px "Prompt", sans-serif';
+    ctx.font = '700 20.5px "Prompt", sans-serif';
     ctx.fillText('Improvement', X(1105.0), Y(172));
 
     // Right-aligned text left of Green Box: Automate / Gridline / Panel / Frame / Smart Board
@@ -6674,17 +6569,17 @@
     ctx.textAlign = 'left';
 
     // Rounded Translucent Teal-Green Container (Rectangle: Rounded Corners 2)
-    drawRoundedBox(X(1277.2), Y(34.5), W(304.6), H(606.2), 40, 'rgba(41, 175, 140, 0.30)', '#29af8c', 2);
+    drawRoundedBox(X(1277.2), Y(56.0), W(304.6), H(584.7), 38, 'rgba(41, 175, 140, 0.30)', '#29af8c', 2);
 
     // Inside Left Label: Logic / Ruby / SketchUp
     ctx.fillStyle = '#bbff6c';
     ctx.textAlign = 'center';
-    ctx.font = '700 17px "Prompt", sans-serif';
-    ctx.fillText('Logic', X(1318.0), Y(260));
-    ctx.font = '600 13px "Prompt", sans-serif';
-    ctx.fillText('Ruby', X(1318.0), Y(276));
-    ctx.font = '600 14.5px "Prompt", sans-serif';
-    ctx.fillText('SketchUp', X(1318.0), Y(293));
+    ctx.font = '700 19px "Prompt", sans-serif';
+    ctx.fillText('Logic', X(1318.0), Y(258));
+    ctx.font = '600 15.5px "Prompt", sans-serif';
+    ctx.fillText('Ruby', X(1318.0), Y(278));
+    ctx.font = '600 16.5px "Prompt", sans-serif';
+    ctx.fillText('SketchUp', X(1318.0), Y(298));
     ctx.textAlign = 'left';
 
     // Top 3-Column Rule Diagram (pic_81_image70.png)
@@ -6706,28 +6601,28 @@
         ctx.translate(X(px), Y(py));
         ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = '#f8fafc';
-        ctx.font = '400 14.5px "Prompt", sans-serif';
+        ctx.font = '500 13.5px "Prompt", sans-serif';
         lines.forEach((txt, i) => {
-          ctx.fillText(txt, 0, i * 16);
+          ctx.fillText(txt, 0, i * 15);
         });
       }
       ctx.restore();
     }
 
     // Top Vertical Headers
-    drawVerticalHeader(['Detecting', 'Wall / Panel'], 1390, 148);
-    drawVerticalHeader(['Gridline'], 1455, 148);
-    drawVerticalHeader(['Coding'], 1510, 148);
+    drawVerticalHeader(['Detecting', 'Wall / Panel'], 1390, 154);
+    drawVerticalHeader(['Gridline'], 1455, 154);
+    drawVerticalHeader(['Coding'], 1510, 154);
 
     // Middle Vertical Headers
-    drawVerticalHeader(['Frame DWG', 'for Assembly'], 1390, 408);
-    drawVerticalHeader(['GEN', 'Smart Board'], 1450, 408);
-    drawVerticalHeader(['Window', 'Panel'], 1510, 408);
+    drawVerticalHeader(['Frame DWG', 'for Assembly'], 1390, 415);
+    drawVerticalHeader(['GEN', 'Smart Board'], 1450, 415);
+    drawVerticalHeader(['Window', 'Panel'], 1510, 415);
 
     // Isometric DATA Document Icon (Group 84) + "DATA" Label
     ctx.fillStyle = '#ffffff';
-    ctx.font = '600 14px "Prompt", sans-serif';
-    ctx.fillText('DATA', X(1296.0), Y(412));
+    ctx.font = '600 16.5px "Prompt", sans-serif';
+    ctx.fillText('DATA', X(1294.0), Y(412));
 
     if (typeof ctx.beginPath === 'function') {
       const dx = X(1293.1), dy = Y(422.0), dw = W(59.2), dh = H(124.0);
@@ -6774,10 +6669,10 @@
 
     // Bottom Label inside Green Container: Auto Generate Item Part (Data Base)
     ctx.fillStyle = '#f8fafc';
-    ctx.font = '400 16.5px "Prompt", sans-serif';
+    ctx.font = '400 18.5px "Prompt", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Auto Generate Item Part', X(1441.0), Y(608));
-    ctx.fillText('(Data Base)', X(1441.0), Y(628));
+    ctx.fillText('Auto Generate Item Part', X(1441.0), Y(606));
+    ctx.fillText('(Data Base)', X(1441.0), Y(629));
     ctx.textAlign = 'left';
 
     // Bottom-Right 3D Cutaway Wall Assembly (Group 97: pic_99_image71.png)
@@ -6792,13 +6687,13 @@
       ctx.translate(X(1396.0), Y(808.0));
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '700 13.5px "Prompt", sans-serif';
+      ctx.font = '700 16px "Prompt", sans-serif';
       ctx.fillText('SMART BOARD', 0, 0);
     }
     ctx.restore();
 
-    // Red & Green Callout Triangles on 3D Wall Cutaway (Isosceles Triangles 99..107)
-    const triPulse = Math.sin(nowSec * 4) * 2;
+    // Red & Green Callout Triangles on 3D Wall Cutaway (stops bouncing at 10s)
+    const triPulse = isSettled ? 0 : (Math.sin(t * 4) * 2);
     drawDownTriangle(X(1394.6), Y(643.5) - triPulse, 14, 18, '#ff0000', '#0f172a', 1.5, 240);
     drawDownTriangle(X(1431.2), Y(661.9) - triPulse, 14, 18, '#ff0000', '#0f172a', 1.5, 240);
     drawDownTriangle(X(1360.6), Y(733.2), 14, 18, '#ff0000', '#0f172a', 1.5, 240);
@@ -6844,39 +6739,39 @@
 
     // Label above Group 4: Easy 3D CHECK
     ctx.textAlign = 'center';
-    ctx.font = '700 16.5px "Prompt", sans-serif';
+    ctx.font = '700 18.5px "Prompt", sans-serif';
     ctx.fillStyle = '#bbff6c';
-    ctx.fillText('Easy', X(1265.0), Y(668));
-    ctx.font = '400 16.5px "Prompt", sans-serif';
+    ctx.fillText('Easy', X(1265.0), Y(666));
+    ctx.font = '400 18.5px "Prompt", sans-serif';
     ctx.fillStyle = '#f8fafc';
     ctx.fillText('3D', X(1265.0), Y(688));
-    ctx.fillText('CHECK', X(1265.0), Y(708));
+    ctx.fillText('CHECK', X(1265.0), Y(710));
 
     // AutoCAD Icon (Right Side) + Labels: Automate Assembly DWG 2D / Automate Plug Switch Smart Board / Auto Generate PO
     if (imCad && imCad.complete && imCad.naturalWidth) {
       ctx.drawImage(imCad, X(1157.3), Y(702.3), 48, 48);
     }
 
-    ctx.font = '700 17.5px "Prompt", sans-serif';
+    ctx.font = '700 19px "Prompt", sans-serif';
     ctx.fillStyle = '#bbff6c';
-    ctx.fillText('Automate', X(1165.0), Y(668));
-    ctx.font = '400 16px "Prompt", sans-serif';
+    ctx.fillText('Automate', X(1165.0), Y(666));
+    ctx.font = '400 18px "Prompt", sans-serif';
     ctx.fillStyle = '#0f172a';
     ctx.fillText('Assembly DWG 2D', X(1165.0), Y(688));
 
-    ctx.font = '700 16.5px "Prompt", sans-serif';
+    ctx.font = '700 18.5px "Prompt", sans-serif';
     ctx.fillStyle = '#bbff6c';
     ctx.fillText('Automate', X(1165.0), Y(768));
-    ctx.font = '400 16px "Prompt", sans-serif';
+    ctx.font = '400 18px "Prompt", sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('Plug Switch', X(1165.0), Y(788));
-    ctx.fillText('Smart Board', X(1165.0), Y(808));
+    ctx.fillText('Plug Switch', X(1165.0), Y(790));
+    ctx.fillText('Smart Board', X(1165.0), Y(812));
 
-    ctx.font = '700 18px "Prompt", sans-serif';
+    ctx.font = '700 19.5px "Prompt", sans-serif';
     ctx.fillStyle = '#bbff6c';
     ctx.fillText('Auto Generate', X(1185.0), Y(882));
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('PO', X(1185.0), Y(904));
+    ctx.fillText('PO', X(1185.0), Y(906));
     ctx.textAlign = 'left';
 
     ctx.restore();
@@ -6917,11 +6812,11 @@
       ctx.translate(X(1182.0), Y(498.0));
       ctx.rotate(-isoAngle);
       ctx.fillStyle = '#bbff6c';
-      ctx.font = '700 17px "Prompt", sans-serif';
+      ctx.font = '700 19px "Prompt", sans-serif';
       ctx.fillText('Automate', 0, 0);
       ctx.fillStyle = '#0f172a';
-      ctx.font = '700 13.5px "Prompt", sans-serif';
-      ctx.fillText('CSV Database', -6, 18);
+      ctx.font = '700 16px "Prompt", sans-serif';
+      ctx.fillText('CSV Database', -6, 20);
     }
     ctx.restore();
 
@@ -6951,22 +6846,22 @@
     const stageAlpha = Math.min(fadeIn, fadeOut);
 
     const metaList = [
-      { code: 'CLIP 01 / 03', title: 'LEAD TIME COMPRESSION : 7 DAYS MANUAL ➔ 1 DAY ENGINE', accent: '#10B981', soft: '#064E3B', pill: '7d ➔ 1d' },
-      { code: 'CLIP 02 / 03', title: 'CYCLE TIME SAVER : ลดเวลาทำงานออกแบบ & BOM รวม 86%', accent: '#F59E0B', soft: '#451A03', pill: '86% Saved' },
-      { code: 'CLIP 03 / 03', title: 'ANNUAL COST REDUCTION : ประหยัดต้นทุนรวม 1.2M THB / YEAR', accent: '#34D399', soft: '#065F46', pill: '1.2M THB' }
+      { code: 'CLIP 01 / 03', title: 'LEAD TIME COMPRESSION : 7 DAYS MANUAL ➔ 1 DAY ENGINE', accent: '#059669', soft: '#ECFDF5', pillFg: '#065F46', pill: '7d ➔ 1d' },
+      { code: 'CLIP 02 / 03', title: 'CYCLE TIME SAVER : ลดเวลาทำงานออกแบบ & BOM รวม 86%', accent: '#D97706', soft: '#FFFBEB', pillFg: '#B45309', pill: '86% Saved' },
+      { code: 'CLIP 03 / 03', title: 'ANNUAL COST REDUCTION : ประหยัดต้นทุนรวม 1.2M THB / YEAR', accent: '#059669', soft: '#ECFDF5', pillFg: '#065F46', pill: '1.2M THB' }
     ];
     const meta = metaList[clipIdx];
 
     ctx.save();
-    // Clip Viewport Outer Shell
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 8;
+    // Clip Viewport Outer Shell (Clean White Studio Theme)
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.09)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 6;
     const shellGrad = ctx.createLinearGradient(x, y, x + w, y + h);
-    shellGrad.addColorStop(0.0, '#091B16');
-    shellGrad.addColorStop(0.55, '#0F2A22');
-    shellGrad.addColorStop(1.0, '#0B1D27');
-    drawRoundedRect(x, y, w, h, 18, shellGrad, meta.accent + 'CC', 1.8);
+    shellGrad.addColorStop(0.0, '#FFFFFF');
+    shellGrad.addColorStop(0.65, '#FFFFFF');
+    shellGrad.addColorStop(1.0, '#F8FAFC');
+    drawRoundedRect(x, y, w, h, 18, shellGrad, meta.accent + '88', 1.6);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
@@ -6978,7 +6873,7 @@
     else ctx.rect(x, y, w, h);
     ctx.clip();
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.035)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let gx = x + 32; gx < x + w; gx += 44) { ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); }
@@ -6987,30 +6882,30 @@
 
     // Top Chrome Bar (h = 54)
     const barH = 54;
-    ctx.fillStyle = 'rgba(5, 14, 12, 0.72)';
+    ctx.fillStyle = '#F8FAFC';
     ctx.fillRect(x, y, w, barH);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fillStyle = '#E2E8F0';
     ctx.fillRect(x, y + barH - 1, w, 1);
 
     // Left Live Pill + Animated Dot
     const pulseDot = 0.45 + 0.55 * Math.sin(nowSec * 6.5);
-    drawRoundedRect(x + 20, y + 13, 134, 28, 14, meta.accent + '26', meta.accent + 'AA', 1.1);
+    drawRoundedRect(x + 20, y + 13, 134, 28, 14, meta.soft, meta.accent + '88', 1.1);
     ctx.fillStyle = meta.accent;
     ctx.beginPath();
     ctx.arc(x + 35, y + 27, 4.2 + pulseDot * 1.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    fit(meta.code, x + 95, y + 31, 96, 11.5, '800', '"JetBrains Mono", monospace', 'center');
+    ctx.fillStyle = meta.pillFg;
+    fit(meta.code, x + 95, y + 31.5, 96, 13.5, '800', '"JetBrains Mono", monospace', 'center');
 
     // Clip Title
-    ctx.fillStyle = '#F8FAFC';
-    fit(meta.title, x + 168, y + 32, 548, 15.5, '800', '"Prompt", sans-serif', 'left');
+    ctx.fillStyle = '#0F172A';
+    fit(meta.title, x + 168, y + 32.5, 548, 17.5, '800', '"Prompt", sans-serif', 'left');
 
     // Right Countdown + Clickable Phase Tabs
     const remSec = Math.max(0, 5.0 - localT).toFixed(1);
-    drawRoundedRect(x + 730, y + 13, 86, 28, 14, 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.2)', 1);
-    ctx.fillStyle = '#A7F3D0';
-    fit(`⏱ ${remSec}s`, x + 773, y + 31, 74, 12, '800', '"JetBrains Mono", monospace', 'center');
+    drawRoundedRect(x + 730, y + 13, 86, 28, 14, '#FFFFFF', '#CBD5E1', 1);
+    ctx.fillStyle = '#047857';
+    fit(`⏱ ${remSec}s`, x + 773, y + 31.5, 74, 14, '800', '"JetBrains Mono", monospace', 'center');
 
     const tabs = [
       { label: '01 · 7→1d', targetT: 0.05, idx: 0, w: 78 },
@@ -7021,9 +6916,9 @@
     let tx = x + 826;
     tabs.forEach((tb) => {
       const active = clipIdx === tb.idx;
-      drawRoundedRect(tx, y + 13, tb.w, 28, 14, active ? meta.accent : 'rgba(255,255,255,0.07)', active ? '#FFFFFF' : 'rgba(255,255,255,0.18)', 1);
-      ctx.fillStyle = active ? '#062019' : '#CBD5E1';
-      fit(tb.label, tx + tb.w / 2, y + 31, tb.w - 10, 11.5, '800', '"Prompt", sans-serif', 'center');
+      drawRoundedRect(tx, y + 13, tb.w, 28, 14, active ? meta.accent : '#FFFFFF', active ? meta.accent : '#CBD5E1', 1);
+      ctx.fillStyle = active ? '#FFFFFF' : '#475569';
+      fit(tb.label, tx + tb.w / 2, y + 31.5, tb.w - 10, 13.5, '800', '"Prompt", sans-serif', 'center');
       app._v3ResultsHits.push({ x: tx, y: y + 13, w: tb.w, h: 28, targetT: tb.targetT });
       tx += tb.w + 6;
     });
@@ -7043,13 +6938,13 @@
       const waveP = easeOutCubic(clamp((localT - 1.0) / 2.3, 0, 1));
 
       // Section Label Top
-      drawRoundedRect(stageX, stageY, 376, 28, 8, 'rgba(239, 68, 68, 0.16)', 'rgba(248, 113, 113, 0.45)', 1);
-      ctx.fillStyle = '#FCA5A5';
-      fit('BEFORE · MANUAL WORKFLOW (7 WORK DAYS · 56 HRS)', stageX + 188, stageY + 18, 354, 11.5, '800', '"Prompt", sans-serif', 'center');
+      drawRoundedRect(stageX, stageY, 412, 30, 8, '#FEF2F2', '#FCA5A5', 1);
+      ctx.fillStyle = '#B91C1C';
+      fit('BEFORE · MANUAL WORKFLOW (7 WORK DAYS · 56 HRS)', stageX + 206, stageY + 19.5, 392, 13.5, '800', '"Prompt", sans-serif', 'center');
 
-      drawRoundedRect(stageX + stageW - 224, stageY, 224, 28, 8, waveP > 0.5 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.18)', waveP > 0.5 ? '#10B981' : '#F59E0B', 1);
-      ctx.fillStyle = waveP > 0.5 ? '#6EE7B7' : '#FDE68A';
-      fit(waveP > 0.5 ? '✓ -6 DAYS ELIMINATED' : '⚡ ANALYZING BOTTLENECKS', stageX + stageW - 112, stageY + 18, 204, 11.5, '800', '"Prompt", sans-serif', 'center');
+      drawRoundedRect(stageX + stageW - 244, stageY, 244, 30, 8, waveP > 0.5 ? '#ECFDF5' : '#FFFBEB', waveP > 0.5 ? '#10B981' : '#F59E0B', 1);
+      ctx.fillStyle = waveP > 0.5 ? '#047857' : '#B45309';
+      fit(waveP > 0.5 ? '✓ -6 DAYS ELIMINATED' : '⚡ ANALYZING BOTTLENECKS', stageX + stageW - 122, stageY + 19.5, 224, 13.5, '800', '"Prompt", sans-serif', 'center');
 
       const days = [
         { d: 'DAY 1', l1: 'แปลนสถาปัตย์', l2: '& กฎ P-Rule' },
@@ -7073,27 +6968,27 @@
         const appearP = easeOutCubic(clamp((localT - idx * 0.11) / 0.35, 0, 1));
         const eliminated = idx > 0 && idx >= sweepIdx;
         ctx.save();
-        ctx.globalAlpha *= appearP * (eliminated ? 0.56 : 1);
-        const bgCol = idx === 0 ? 'rgba(16, 185, 129, 0.16)' : (eliminated ? 'rgba(30, 41, 59, 0.52)' : 'rgba(127, 29, 29, 0.32)');
-        const brCol = idx === 0 ? '#10B981' : (eliminated ? '#64748B' : '#F8717188');
+        ctx.globalAlpha *= appearP * (eliminated ? 0.65 : 1);
+        const bgCol = idx === 0 ? '#ECFDF5' : (eliminated ? '#F8FAFC' : '#FEF2F2');
+        const brCol = idx === 0 ? '#10B981' : (eliminated ? '#CBD5E1' : '#FCA5A5');
         drawRoundedRect(dx, dayY, dayW, dayH, 12, bgCol, brCol, idx === 0 ? 1.8 : 1.1);
 
-        drawRoundedRect(dx + 10, dayY + 10, 62, 22, 6, idx === 0 ? '#059669' : 'rgba(255,255,255,0.12)', null, 0);
-        ctx.fillStyle = '#FFFFFF';
-        fit(item.d, dx + 41, dayY + 25, 54, 11, '800', '"JetBrains Mono", monospace', 'center');
+        drawRoundedRect(dx + 10, dayY + 10, 62, 22, 6, idx === 0 ? '#059669' : (eliminated ? '#E2E8F0' : '#FEE2E2'), null, 0);
+        ctx.fillStyle = idx === 0 ? '#FFFFFF' : (eliminated ? '#475569' : '#991B1B');
+        fit(item.d, dx + 41, dayY + 25.5, 54, 13, '800', '"JetBrains Mono", monospace', 'center');
 
         if (idx > 0 && !eliminated) {
-          ctx.fillStyle = '#FCA5A5';
-          fit('MANUAL', dx + dayW - 10, dayY + 25, 58, 10, '700', '"JetBrains Mono", monospace', 'right');
+          ctx.fillStyle = '#DC2626';
+          fit('MANUAL', dx + dayW - 10, dayY + 25.5, 62, 12.5, '700', '"JetBrains Mono", monospace', 'right');
         } else if (idx === 0) {
-          ctx.fillStyle = '#6EE7B7';
-          fit('TARGET', dx + dayW - 10, dayY + 25, 58, 10, '700', '"JetBrains Mono", monospace', 'right');
+          ctx.fillStyle = '#047857';
+          fit('TARGET', dx + dayW - 10, dayY + 25.5, 62, 12.5, '700', '"JetBrains Mono", monospace', 'right');
         }
 
-        ctx.fillStyle = eliminated ? '#E2E8F0' : '#F1F5F9';
-        fit(item.l1, dx + 10, dayY + 64, dayW - 20, 14, '700', '"Prompt", sans-serif', 'left');
-        ctx.fillStyle = eliminated ? '#CBD5E1' : '#CBD5E1';
-        fit(item.l2, dx + 10, dayY + 86, dayW - 20, 13, '500', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = eliminated ? '#475569' : '#0F172A';
+        fit(item.l1, dx + 10, dayY + 65, dayW - 20, 16.5, '700', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = eliminated ? '#64748B' : '#475569';
+        fit(item.l2, dx + 10, dayY + 90, dayW - 20, 15.5, '500', '"Prompt", sans-serif', 'left');
 
         if (eliminated) {
           ctx.strokeStyle = '#EF4444';
@@ -7111,7 +7006,7 @@
         const beamX = stageX + (sweepIdx + 0.5) * (dayW + dayGap);
         const beamGrad = ctx.createLinearGradient(beamX - 24, 0, beamX + 24, 0);
         beamGrad.addColorStop(0, 'rgba(16,185,129,0)');
-        beamGrad.addColorStop(0.5, 'rgba(52,211,153,0.75)');
+        beamGrad.addColorStop(0.5, 'rgba(16,185,129,0.45)');
         beamGrad.addColorStop(1, 'rgba(16,185,129,0)');
         ctx.fillStyle = beamGrad;
         ctx.fillRect(Math.max(stageX, beamX - 24), dayY - 4, 48, dayH + 8);
@@ -7119,14 +7014,14 @@
 
       // Middle Conduit: OTF Input -> AutoBOM Ruby Engine
       const midY = stageY + 178;
-      drawRoundedRect(stageX + 218, midY, stageW - 436, 46, 23, 'rgba(6, 78, 59, 0.72)', '#10B981AA', 1.4);
-      ctx.fillStyle = '#ECFDF5';
+      drawRoundedRect(stageX + 218, midY, stageW - 436, 46, 23, '#ECFDF5', '#10B981', 1.4);
+      ctx.fillStyle = '#065F46';
       fit('⚡  QHeim_AutoBOM.rb Engine  ·  Single Model 5-Stream Parallel Execution', stageX + stageW / 2, midY + 29, stageW - 476, 15, '800', '"Prompt", sans-serif', 'center');
 
       // Animated Particle Flow into Bottom Box
       for (let pi = 0; pi < 5; pi++) {
         const py = midY + 46 + ((nowSec * 36 + pi * 9) % 24);
-        ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
+        ctx.fillStyle = 'rgba(5, 150, 105, 0.85)';
         ctx.beginPath();
         ctx.arc(stageX + stageW / 2 + (pi - 2) * 86, py, 3.2, 0, Math.PI * 2);
         ctx.fill();
@@ -7135,31 +7030,31 @@
       // Bottom Hero Box: AFTER DAY 1 AUTOMATED ENGINE
       const aftY = stageY + 244;
       const aftH = stageH - 244;
-      drawRoundedRect(stageX, aftY, stageW, aftH, 16, 'rgba(5, 46, 36, 0.78)', '#10B981', 2.0);
+      drawRoundedRect(stageX, aftY, stageW, aftH, 16, '#F8FAFC', '#10B981', 1.8);
 
       // Left Hero Metric inside After Box
       const heroW = 340;
-      drawRoundedRect(stageX + 20, aftY + 18, heroW, aftH - 36, 14, 'rgba(6, 95, 70, 0.55)', '#34D39966', 1.2);
-      drawRoundedRect(stageX + 38, aftY + 34, 198, 26, 13, '#10B981', null, 0);
-      ctx.fillStyle = '#052E24';
-      fit('AFTER · DAY 1 READY', stageX + 137, aftY + 51, 180, 11.5, '900', '"Prompt", sans-serif', 'center');
-
+      drawRoundedRect(stageX + 20, aftY + 18, heroW, aftH - 36, 14, '#ECFDF5', '#10B98188', 1.3);
+      drawRoundedRect(stageX + 38, aftY + 34, 214, 28, 14, '#059669', null, 0);
       ctx.fillStyle = '#FFFFFF';
+      fit('AFTER · DAY 1 READY', stageX + 145, aftY + 52.5, 194, 13.5, '900', '"Prompt", sans-serif', 'center');
+
+      ctx.fillStyle = '#0F172A';
       fit('1 DAY', stageX + 38, aftY + 124, 190, 56, '900', '"Prompt", sans-serif', 'left');
-      ctx.fillStyle = '#6EE7B7';
-      fit('Engine Run ≤ 2 Min', stageX + 38, aftY + 158, 290, 17, '800', '"JetBrains Mono", monospace', 'left');
-      ctx.fillStyle = '#D1FAE5';
-      fit('ขึ้นโมเดล C75 + ถอด BOM + 2D + CNC พร้อมกัน', stageX + 38, aftY + 188, 304, 13.5, '500', '"Prompt", sans-serif', 'left');
-      ctx.fillStyle = '#A7F3D0';
-      fit('ความเร็วเพิ่มขึ้น 7 เท่า  ·  Zero Human Wait', stageX + 38, aftY + 214, 304, 13, '700', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#047857';
+      fit('Engine Run ≤ 2 Min', stageX + 38, aftY + 160, 290, 19.5, '800', '"JetBrains Mono", monospace', 'left');
+      ctx.fillStyle = '#334155';
+      fit('ขึ้นโมเดล C75 + ถอด BOM + 2D + CNC พร้อมกัน', stageX + 38, aftY + 190, 304, 15.5, '500', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#047857';
+      fit('ความเร็วเพิ่มขึ้น 7 เท่า  ·  Zero Human Wait', stageX + 38, aftY + 216, 304, 15, '700', '"Prompt", sans-serif', 'left');
 
       // Right 5 Automated Streams Completing in Parallel
       const streams = [
-        { code: '01', name: '3D Visualization (.SKP)', desc: 'C75 Structural Wall + EE Boxes', col: '#10B981' },
-        { code: '02', name: 'Part Items BOM (.XLSX)', desc: 'Auto Material Take-Off -> MRP PO', col: '#F59E0B' },
-        { code: '03', name: 'Job Order Sheet (.PDF)', desc: 'Production Line Picking List S238', col: '#3B82F6' },
-        { code: '04', name: '2D Shop Drawing (.DWG)', desc: 'Auto Wall Assembly Layout (±1mm)', col: '#14B8A6' },
-        { code: '05', name: 'SB List & CNC (.DXF)', desc: 'CAD EE Punching & Bending Path', col: '#A855F7' }
+        { code: '01', name: '3D Visualization (.SKP)', desc: 'C75 Structural Wall + EE Boxes', col: '#059669' },
+        { code: '02', name: 'Part Items BOM (.XLSX)', desc: 'Auto Material Take-Off -> MRP PO', col: '#D97706' },
+        { code: '03', name: 'Job Order Sheet (.PDF)', desc: 'Production Line Picking List S238', col: '#2563EB' },
+        { code: '04', name: '2D Shop Drawing (.DWG)', desc: 'Auto Wall Assembly Layout (±1mm)', col: '#0D9488' },
+        { code: '05', name: 'SB List & CNC (.DXF)', desc: 'CAD EE Punching & Bending Path', col: '#9333EA' }
       ];
       const stX = stageX + heroW + 38;
       const stW = stageW - heroW - 58;
@@ -7168,31 +7063,31 @@
       streams.forEach((st, idx) => {
         const sy = aftY + 18 + idx * (rowH + 6);
         const prog = easeOutCubic(clamp((localT - 1.15 - idx * 0.32) / 1.15, 0, 1));
-        drawRoundedRect(stX, sy, stW, rowH, 10, 'rgba(15, 23, 42, 0.56)', prog >= 0.98 ? st.col : 'rgba(255,255,255,0.12)', 1.2);
+        drawRoundedRect(stX, sy, stW, rowH, 10, '#FFFFFF', prog >= 0.98 ? st.col : '#E2E8F0', 1.2);
 
-        drawRoundedRect(stX + 10, sy + (rowH - 26) / 2, 34, 26, 7, st.col + '33', st.col, 1);
-        ctx.fillStyle = '#FFFFFF';
-        fit(st.code, stX + 27, sy + rowH / 2 + 5, 28, 12, '900', '"JetBrains Mono", monospace', 'center');
+        drawRoundedRect(stX + 10, sy + (rowH - 26) / 2, 34, 26, 7, st.col + '18', st.col, 1);
+        ctx.fillStyle = st.col;
+        fit(st.code, stX + 27, sy + rowH / 2 + 5.5, 28, 14, '900', '"JetBrains Mono", monospace', 'center');
 
-        ctx.fillStyle = '#F8FAFC';
-        fit(st.name, stX + 56, sy + rowH / 2 + 5, 236, 14, '700', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = '#0F172A';
+        fit(st.name, stX + 54, sy + rowH / 2 + 5.5, 240, 16.5, '700', '"Prompt", sans-serif', 'left');
 
         // Animated progress bar
         const barX = stX + 306;
         const barW = stW - 432;
         const barY = sy + rowH / 2 - 4;
-        drawRoundedRect(barX, barY, barW, 8, 4, 'rgba(255,255,255,0.12)', null, 0);
+        drawRoundedRect(barX, barY, barW, 8, 4, '#E2E8F0', null, 0);
         if (prog > 0.01) {
           drawRoundedRect(barX, barY, Math.max(8, barW * prog), 8, 4, st.col, null, 0);
         }
 
         if (prog >= 0.98) {
-          drawRoundedRect(stX + stW - 110, sy + (rowH - 26) / 2, 96, 26, 8, 'rgba(16, 185, 129, 0.22)', '#10B981', 1);
-          ctx.fillStyle = '#6EE7B7';
-          fit('✓ READY', stX + stW - 62, sy + rowH / 2 + 5, 84, 11.5, '800', '"JetBrains Mono", monospace', 'center');
+          drawRoundedRect(stX + stW - 110, sy + (rowH - 26) / 2, 96, 26, 8, '#ECFDF5', '#10B981', 1);
+          ctx.fillStyle = '#047857';
+          fit('✓ READY', stX + stW - 62, sy + rowH / 2 + 5.5, 84, 13.5, '800', '"JetBrains Mono", monospace', 'center');
         } else {
-          ctx.fillStyle = '#94A3B8';
-          fit(`${Math.round(prog * 100)}%`, stX + stW - 62, sy + rowH / 2 + 5, 84, 12, '700', '"JetBrains Mono", monospace', 'center');
+          ctx.fillStyle = '#475569';
+          fit(`${Math.round(prog * 100)}%`, stX + stW - 62, sy + rowH / 2 + 5.5, 84, 14, '700', '"JetBrains Mono", monospace', 'center');
         }
       });
 
@@ -7200,11 +7095,11 @@
       // === CLIP 2 (5..10s): 86% CYCLE TIME SAVER ===
       const gaugeP = easeOutCubic(clamp(localT / 2.4, 0, 1));
       const gW = 414;
-      drawRoundedRect(stageX, stageY, gW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(245, 158, 11, 0.55)', 1.5);
+      drawRoundedRect(stageX, stageY, gW, stageH, 16, '#FFFFFF', '#F59E0B88', 1.5);
 
-      drawRoundedRect(stageX + gW / 2 - 114, stageY + 20, 228, 28, 14, 'rgba(245, 158, 11, 0.18)', '#F59E0B88', 1);
-      ctx.fillStyle = '#FDE68A';
-      fit('OVERALL EFFICIENCY GAIN', stageX + gW / 2, stageY + 38, 206, 11.5, '800', '"Prompt", sans-serif', 'center');
+      drawRoundedRect(stageX + gW / 2 - 122, stageY + 20, 244, 28, 14, '#FEF3C7', '#F59E0B88', 1);
+      ctx.fillStyle = '#B45309';
+      fit('OVERALL EFFICIENCY GAIN', stageX + gW / 2, stageY + 38.5, 224, 13.5, '800', '"Prompt", sans-serif', 'center');
 
       // Radial Speedometer Arc (cx, cy)
       const cx = stageX + gW / 2;
@@ -7216,7 +7111,7 @@
 
       // Subtle dashed tick ring
       ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.14)';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 10]);
       ctx.beginPath();
@@ -7225,7 +7120,7 @@
       ctx.setLineDash([]);
 
       // Track Arc
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.strokeStyle = '#E2E8F0';
       ctx.lineWidth = 22;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -7236,67 +7131,70 @@
       const arcGrad = ctx.createLinearGradient(cx - rad, cy, cx + rad, cy - rad);
       arcGrad.addColorStop(0.0, '#F59E0B');
       arcGrad.addColorStop(0.55, '#10B981');
-      arcGrad.addColorStop(1.0, '#6EE7B7');
+      arcGrad.addColorStop(1.0, '#059669');
       ctx.strokeStyle = arcGrad;
       ctx.lineWidth = 22;
       ctx.beginPath();
       ctx.arc(cx, cy, rad, startAng, fillAng);
       ctx.stroke();
 
-      // Glowing Tip Dot
+      // Crisp Tip Dot
       const tipX = cx + Math.cos(fillAng) * rad;
       const tipY = cy + Math.sin(fillAng) * rad;
       ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = '#34D399';
-      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#059669';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(5, 150, 105, 0.35)';
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(tipX, tipY, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.stroke();
       ctx.restore();
 
       // Gauge Center Readout
-      ctx.fillStyle = '#FFFFFF';
-      fit(`${Math.round(86 * gaugeP)}%`, cx, cy + 16, 170, 62, '900', '"Prompt", sans-serif', 'center');
-      ctx.fillStyle = '#6EE7B7';
-      fit('CYCLE TIME SAVED', cx, cy + 48, 170, 13, '800', '"JetBrains Mono", monospace', 'center');
-      ctx.fillStyle = '#CBD5E1';
-      fit('ประหยัดเวลากระบวนการออกแบบรวม', cx, cy + 78, 260, 13.5, '500', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#0F172A';
+      fit(`${Math.round(86 * gaugeP)}%`, cx, cy + 12, 170, 62, '900', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#059669';
+      fit('CYCLE TIME SAVED', cx, cy + 46, 178, 14.5, '800', '"JetBrains Mono", monospace', 'center');
+      ctx.fillStyle = '#475569';
+      fit('ประหยัดเวลากระบวนการออกแบบรวม', cx, cy + 118, 286, 15.5, '600', '"Prompt", sans-serif', 'center');
 
       // Bottom Before/After Comparison Boxes inside Gauge Panel
       const boxY = stageY + stageH - 134;
-      drawRoundedRect(stageX + 20, boxY, 168, 110, 12, 'rgba(127, 29, 29, 0.28)', '#F8717166', 1.1);
-      ctx.fillStyle = '#FCA5A5';
-      fit('MANUAL BASELINE', stageX + 104, boxY + 26, 150, 11, '800', '"Prompt", sans-serif', 'center');
-      ctx.fillStyle = '#FFFFFF';
+      drawRoundedRect(stageX + 20, boxY, 168, 110, 12, '#FEF2F2', '#FCA5A5', 1.1);
+      ctx.fillStyle = '#B91C1C';
+      fit('MANUAL BASELINE', stageX + 104, boxY + 26, 152, 13.5, '800', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#0F172A';
       fit('56.0 hrs', stageX + 104, boxY + 64, 150, 26, '900', '"Prompt", sans-serif', 'center');
-      ctx.fillStyle = '#CBD5E1';
-      fit('7 วัน / หลัง (ทำมือทั้งหมด)', stageX + 104, boxY + 90, 150, 11.5, '500', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#475569';
+      fit('7 วัน / หลัง (ทำมือทั้งหมด)', stageX + 104, boxY + 92, 154, 13.5, '500', '"Prompt", sans-serif', 'center');
 
-      ctx.fillStyle = '#34D399';
+      ctx.fillStyle = '#059669';
       fit('➔', stageX + gW / 2, boxY + 62, 26, 20, '900', '"Prompt", sans-serif', 'center');
 
-      drawRoundedRect(stageX + gW - 188, boxY, 168, 110, 12, 'rgba(6, 78, 59, 0.56)', '#34D39988', 1.2);
-      ctx.fillStyle = '#6EE7B7';
-      fit('AUTO BOM SYSTEM', stageX + gW - 104, boxY + 26, 150, 11, '800', '"Prompt", sans-serif', 'center');
-      ctx.fillStyle = '#FFFFFF';
+      drawRoundedRect(stageX + gW - 188, boxY, 168, 110, 12, '#ECFDF5', '#10B981', 1.2);
+      ctx.fillStyle = '#047857';
+      fit('AUTO BOM SYSTEM', stageX + gW - 104, boxY + 26, 152, 13.5, '800', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#0F172A';
       fit('7.8 hrs', stageX + gW - 104, boxY + 64, 150, 26, '900', '"Prompt", sans-serif', 'center');
-      ctx.fillStyle = '#D1FAE5';
-      fit('1 วัน / หลัง (-86% รวม QC)', stageX + gW - 104, boxY + 90, 150, 11.5, '500', '"Prompt", sans-serif', 'center');
+      ctx.fillStyle = '#065F46';
+      fit('1 วัน / หลัง (-86% รวม QC)', stageX + gW - 104, boxY + 92, 154, 13.5, '500', '"Prompt", sans-serif', 'center');
 
       // Right Side: 5 Process Workstream Race Bars
       const rX = stageX + gW + 20;
       const rW = stageW - gW - 20;
-      drawRoundedRect(rX, stageY, rW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(255,255,255,0.14)', 1.3);
-      ctx.fillStyle = '#FFFFFF';
-      fit('TIME SAVED BY WORKSTREAM — เปรียบเทียบเวลาต่อแบบบ้าน 1 หลัง', rX + 24, stageY + 34, rW - 48, 15.5, '800', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(rX, stageY, rW, stageH, 16, '#FFFFFF', '#CBD5E1', 1.3);
+      ctx.fillStyle = '#0F172A';
+      fit('TIME SAVED BY WORKSTREAM — เปรียบเทียบเวลาต่อแบบบ้าน 1 หลัง', rX + 24, stageY + 35, rW - 48, 18, '800', '"Prompt", sans-serif', 'left');
 
       const tracks = [
-        { name: '01 · อ่านแปลน OTF & ตรวจกฎ P-Rule', before: '8.0 hrs', after: '0.5 min', ratio: 0.02, save: '-99%', col: '#10B981' },
-        { name: '02 · ขึ้นโครง 3D C75 & เจาะช่องไฟ EE', before: '16.0 hrs', after: '1.2 min', ratio: 0.03, save: '-99%', col: '#34D399' },
-        { name: '03 · ถอดรายการ Part Items (BOM)', before: '12.0 hrs', after: '0.3 min', ratio: 0.02, save: '-99%', col: '#F59E0B' },
-        { name: '04 · สร้างแบบประกอบ 2D Assembly DWG', before: '12.0 hrs', after: '2.5 hrs (Auto+QC)', ratio: 0.21, save: '-79%', col: '#38BDF8' },
-        { name: '05 · ออก Job Order & SB List (.DXF CNC)', before: '8.0 hrs', after: '0.5 hrs (Auto+QC)', ratio: 0.06, save: '-94%', col: '#A78BFA' }
+        { name: '01 · อ่านแปลน OTF & ตรวจกฎ P-Rule', before: '8.0 hrs', after: '0.5 min', ratio: 0.02, save: '-99%', col: '#059669' },
+        { name: '02 · ขึ้นโครง 3D C75 & เจาะช่องไฟ EE', before: '16.0 hrs', after: '1.2 min', ratio: 0.03, save: '-99%', col: '#10B981' },
+        { name: '03 · ถอดรายการ Part Items (BOM)', before: '12.0 hrs', after: '0.3 min', ratio: 0.02, save: '-99%', col: '#D97706' },
+        { name: '04 · สร้างแบบประกอบ 2D Assembly DWG', before: '12.0 hrs', after: '2.5 hrs (Auto+QC)', ratio: 0.21, save: '-79%', col: '#0284C7' },
+        { name: '05 · ออก Job Order & SB List (.DXF CNC)', before: '8.0 hrs', after: '0.5 hrs (Auto+QC)', ratio: 0.06, save: '-94%', col: '#7C3AED' }
       ];
       const trackGap = 12;
       const trackStartY = stageY + 54;
@@ -7305,71 +7203,74 @@
       tracks.forEach((tr, idx) => {
         const ty = trackStartY + idx * (trackH + trackGap);
         const rowP = easeOutCubic(clamp((localT - 0.35 - idx * 0.35) / 1.35, 0, 1));
-        drawRoundedRect(rX + 20, ty, rW - 40, trackH, 12, 'rgba(255, 255, 255, 0.05)', 'rgba(255,255,255,0.10)', 1);
+        drawRoundedRect(rX + 20, ty, rW - 40, trackH, 12, '#F8FAFC', '#E2E8F0', 1);
 
-        ctx.fillStyle = '#F8FAFC';
-        fit(tr.name, rX + 36, ty + 28, rW - 220, 14.5, '700', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = '#0F172A';
+        fit(tr.name, rX + 36, ty + 29, rW - 216, 17, '700', '"Prompt", sans-serif', 'left');
 
-        drawRoundedRect(rX + rW - 118, ty + 11, 82, 24, 12, tr.col + '26', tr.col, 1);
+        drawRoundedRect(rX + rW - 118, ty + 11, 82, 24, 12, tr.col + '18', tr.col, 1);
         ctx.fillStyle = tr.col;
-        fit(tr.save, rX + rW - 77, ty + 27, 68, 12, '900', '"JetBrains Mono", monospace', 'center');
+        fit(tr.save, rX + rW - 77, ty + 27.5, 68, 14, '900', '"JetBrains Mono", monospace', 'center');
 
         // Full Before Track vs Dynamic Compressed Auto Track
         const tbX = rX + 36;
         const tbW = rW - 310;
         const tbY = ty + 48;
-        drawRoundedRect(tbX, tbY, tbW, 12, 6, 'rgba(239, 68, 68, 0.26)', 'rgba(248,113,113,0.4)', 0.8);
+        drawRoundedRect(tbX, tbY, tbW, 12, 6, '#FEE2E2', '#FCA5A5', 0.8);
         const curRatio = 1 - (1 - tr.ratio) * rowP;
         drawRoundedRect(tbX, tbY, Math.max(12, tbW * curRatio), 12, 6, tr.col, null, 0);
 
         // Racing photon inside bar
         const rDotX = tbX + Math.max(8, tbW * curRatio) * ((nowSec * 1.1 + idx * 0.2) % 1);
         ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = tr.col;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(rDotX, tbY + 6, 3.5, 0, Math.PI * 2);
+        ctx.arc(rDotX, tbY + 6, 3.8, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
 
-        ctx.fillStyle = '#CBD5E1';
-        fit(`${tr.before} ➔ ${tr.after}`, rX + rW - 36, tbY + 11, 212, 12.5, '700', '"JetBrains Mono", monospace', 'right');
+        ctx.fillStyle = '#334155';
+        fit(`${tr.before} ➔ ${tr.after}`, rX + rW - 36, tbY + 11.5, 224, 15, '700', '"JetBrains Mono", monospace', 'right');
       });
 
     } else {
       // === CLIP 3 (10..15s): 1.2M THB / YEAR COST REDUCTION ===
       const curveP = easeOutCubic(clamp(localT / 3.0, 0, 1));
       const cW = 678;
-      drawRoundedRect(stageX, stageY, cW, stageH, 16, 'rgba(15, 23, 42, 0.56)', 'rgba(52, 211, 153, 0.52)', 1.5);
+      drawRoundedRect(stageX, stageY, cW, stageH, 16, '#FFFFFF', '#10B98188', 1.5);
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#0F172A';
       fit('CUMULATIVE COST REDUCTION TRAJECTORY (12 MONTHS · 0 ➔ 1.2M THB)', stageX + 24, stageY + 34, cW - 190, 15.5, '800', '"Prompt", sans-serif', 'left');
-      drawRoundedRect(stageX + cW - 160, stageY + 16, 138, 26, 13, 'rgba(16, 185, 129, 0.22)', '#34D399', 1);
-      ctx.fillStyle = '#6EE7B7';
+      drawRoundedRect(stageX + cW - 160, stageY + 16, 138, 26, 13, '#ECFDF5', '#10B981', 1);
+      ctx.fillStyle = '#047857';
       fit('TARGET: 1.2M/YR', stageX + cW - 91, stageY + 33, 122, 11, '800', '"JetBrains Mono", monospace', 'center');
 
       // Chart Plot Geometry
       const px = stageX + 76;
       const py = stageY + 84;
-      const pw = cW - 110;
+      const pw = cW - 136;
       const ph = stageH - 168;
 
       const yLevels = ['1.2M', '0.9M', '0.6M', '0.3M', '0 THB'];
       yLevels.forEach((lbl, i) => {
         const gy = py + (ph / 4) * i;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.strokeStyle = '#E2E8F0';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(px, gy);
         ctx.lineTo(px + pw, gy);
         ctx.stroke();
 
-        ctx.fillStyle = '#94A3B8';
-        fit(lbl, px - 12, gy + 4, 58, 11.5, '700', '"JetBrains Mono", monospace', 'right');
+        ctx.fillStyle = '#475569';
+        fit(lbl, px - 12, gy + 4.5, 62, 13.5, '700', '"JetBrains Mono", monospace', 'right');
       });
 
       const xLabels = ['START', 'Q1 (M1-M3)', 'Q2 (M4-M6)', 'Q3 (M7-M9)', 'Q4 (M10-M12)'];
       xLabels.forEach((lbl, i) => {
         const gx = px + (pw / 4) * i;
-        ctx.fillStyle = '#94A3B8';
-        fit(lbl, gx, py + ph + 24, 110, 11.5, '700', '"JetBrains Mono", monospace', 'center');
+        ctx.fillStyle = '#475569';
+        fit(lbl, gx, py + ph + 25, 118, 13.5, '700', '"JetBrains Mono", monospace', 'center');
       });
 
       // Smooth Cumulative Curve Path
@@ -7386,8 +7287,8 @@
 
       // Area Gradient Fill underneath curve
       const areaGrad = ctx.createLinearGradient(0, py, 0, py + ph);
-      areaGrad.addColorStop(0.0, 'rgba(52, 211, 153, 0.36)');
-      areaGrad.addColorStop(0.6, 'rgba(16, 185, 129, 0.14)');
+      areaGrad.addColorStop(0.0, 'rgba(16, 185, 129, 0.22)');
+      areaGrad.addColorStop(0.6, 'rgba(16, 185, 129, 0.07)');
       areaGrad.addColorStop(1.0, 'rgba(16, 185, 129, 0.00)');
 
       ctx.beginPath();
@@ -7404,9 +7305,9 @@
 
       // Curve Line Stroke
       const lineGrad = ctx.createLinearGradient(px, py + ph, px + pw, py);
-      lineGrad.addColorStop(0, '#10B981');
-      lineGrad.addColorStop(0.65, '#34D399');
-      lineGrad.addColorStop(1, '#FBBF24');
+      lineGrad.addColorStop(0, '#059669');
+      lineGrad.addColorStop(0.65, '#10B981');
+      lineGrad.addColorStop(1, '#D97706');
       ctx.strokeStyle = lineGrad;
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
@@ -7423,58 +7324,64 @@
       [0.25, 0.50, 0.75, 1.0].forEach((mU, mi) => {
         if (curveP >= mU - 0.02) {
           const mp = getPt(mU);
-          ctx.fillStyle = mi === 3 ? '#FBBF24' : '#34D399';
+          ctx.fillStyle = mi === 3 ? '#D97706' : '#059669';
           ctx.beginPath();
           ctx.arc(mp.x, mp.y, mi === 3 ? 7 : 5, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = '#FDE68A';
-          fit(['+0.3M', '+0.6M', '+0.9M', '1.2M ✓'][mi], mp.x - (mi === 3 ? 28 : 0), mp.y - 14, 70, 12, '800', '"JetBrains Mono", monospace', 'center');
+          ctx.fillStyle = mi === 3 ? '#B45309' : '#047857';
+          const lblX = mi === 3 ? mp.x - 6 : mp.x;
+          const lblY = mi === 3 ? mp.y + 22 : mp.y - 14;
+          fit(['+0.3M', '+0.6M', '+0.9M', '1.2M ✓'][mi], lblX, lblY, 78, 14, '800', '"JetBrains Mono", monospace', 'center');
         }
       });
 
       // Live Tracking Marker Badge at tipPt
       ctx.save();
       ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = '#FBBF24';
-      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#D97706';
+      ctx.lineWidth = 2.6;
+      ctx.shadowColor = 'rgba(217, 119, 6, 0.35)';
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(tipPt.x, tipPt.y, 6.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
       ctx.restore();
 
-      const callX = clamp(tipPt.x - 62, px + 8, px + pw - 134);
-      const callY = clamp(tipPt.y - 52, py + 6, py + ph - 40);
-      drawRoundedRect(callX, callY, 124, 30, 8, '#064E3B', '#FBBF24', 1.4);
-      ctx.fillStyle = '#FFFFFF';
-      fit(`${(1.2 * curveP).toFixed(2)}M THB`, callX + 62, callY + 20, 110, 13, '900', '"JetBrains Mono", monospace', 'center');
+      const callX = clamp(tipPt.x - 154, px + 8, px + pw - 154);
+      const callY = clamp(tipPt.y - 38, stageY + 50, py + ph - 38);
+      drawRoundedRect(callX, callY, 138, 32, 8, '#FFFFFF', '#059669', 1.6);
+      ctx.fillStyle = '#047857';
+      fit(`${(1.2 * curveP).toFixed(2)}M THB`, callX + 69, callY + 21.5, 124, 15, '900', '"JetBrains Mono", monospace', 'center');
 
       // Chart Footnote Strip
-      drawRoundedRect(stageX + 20, stageY + stageH - 54, cW - 40, 36, 10, 'rgba(6, 78, 59, 0.45)', '#10B98155', 1);
-      ctx.fillStyle = '#D1FAE5';
-      fit('✓ ลดต้นทุนแรงงานซ้ำซ้อน  ·  ตัดของเสียหน้างานจากผิดแบบ  ·  คืนทุนทันทีตั้งแต่งวดแรก', stageX + cW / 2, stageY + stageH - 31, cW - 64, 13.5, '600', '"Prompt", sans-serif', 'center');
+      drawRoundedRect(stageX + 20, stageY + stageH - 54, cW - 40, 36, 10, '#ECFDF5', '#A7F3D0', 1);
+      ctx.fillStyle = '#065F46';
+      fit('✓ ลดต้นทุนแรงงานซ้ำซ้อน  ·  ตัดของเสียหน้างานจากผิดแบบ  ·  คืนทุนทันทีตั้งแต่งวดแรก', stageX + cW / 2, stageY + stageH - 30, cW - 52, 15.5, '600', '"Prompt", sans-serif', 'center');
 
       // Right Column: Hero Total + 3 Breakdown Drivers
       const bX = stageX + cW + 20;
       const bW = stageW - cW - 20;
       const heroGrad = ctx.createLinearGradient(bX, stageY, bX + bW, stageY + 132);
-      heroGrad.addColorStop(0, '#0F3D31');
-      heroGrad.addColorStop(1, '#1A5947');
-      drawRoundedRect(bX, stageY, bW, 132, 16, heroGrad, '#6EE7B7', 1.6);
+      heroGrad.addColorStop(0, '#FFFFFF');
+      heroGrad.addColorStop(1, '#ECFDF5');
+      drawRoundedRect(bX, stageY, bW, 132, 16, heroGrad, '#10B981', 1.6);
 
-      ctx.fillStyle = '#A7F3D0';
-      fit('ANNUAL COST REDUCTION TOTAL', bX + 24, stageY + 30, bW - 48, 11.5, '800', '"Prompt", sans-serif', 'left');
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#047857';
+      fit('ANNUAL COST REDUCTION TOTAL', bX + 24, stageY + 30, bW - 48, 14, '800', '"Prompt", sans-serif', 'left');
+      ctx.fillStyle = '#0F172A';
       fit(`${(1.2 * curveP).toFixed(1)}M`, bX + 24, stageY + 90, 174, 52, '900', '"Prompt", sans-serif', 'left');
-      drawRoundedRect(bX + 206, stageY + 54, 152, 34, 10, 'rgba(251, 191, 36, 0.22)', '#FBBF24', 1.2);
-      ctx.fillStyle = '#FDE68A';
-      fit('THB / YEAR', bX + 282, stageY + 76, 136, 14, '900', '"JetBrains Mono", monospace', 'center');
-      ctx.fillStyle = '#D1FAE5';
-      fit('มูลค่าที่ประหยัดได้จริงต่อปีจาก Auto BOM', bX + 24, stageY + 118, bW - 48, 12.5, '500', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(bX + 206, stageY + 54, 158, 34, 10, '#FFFBEB', '#F59E0B', 1.2);
+      ctx.fillStyle = '#B45309';
+      fit('THB / YEAR', bX + 285, stageY + 76.5, 144, 16, '900', '"JetBrains Mono", monospace', 'center');
+      ctx.fillStyle = '#334155';
+      fit('มูลค่าที่ประหยัดได้จริงต่อปีจาก Auto BOM', bX + 24, stageY + 119, bW - 48, 15, '500', '"Prompt", sans-serif', 'left');
 
       const drivers = [
-        { code: '01', title: 'MAN-HOUR EFFICIENCY', val: 650, pct: 0.54, sub: 'ลดชั่วโมงเขียนแบบ & ถอด BOM ซ้ำซ้อน', col: '#10B981' },
-        { code: '02', title: 'REWORK & SCRAP ZEROING', val: 350, pct: 0.29, sub: 'ลดปัญหาสั่งเหล็กผิด / เจาะ EE คลาดเคลื่อน', col: '#F59E0B' },
-        { code: '03', title: 'STANDARDIZATION SPEED', val: 200, pct: 0.17, sub: 'ลดเวลารอตรวจ Cross-Check ก่อนผลิต', col: '#38BDF8' }
+        { code: '01', title: 'MAN-HOUR EFFICIENCY', val: 650, pct: 0.54, sub: 'ลดชั่วโมงเขียนแบบ & ถอด BOM ซ้ำซ้อน', col: '#059669' },
+        { code: '02', title: 'REWORK & SCRAP ZEROING', val: 350, pct: 0.29, sub: 'ลดปัญหาสั่งเหล็กผิด / เจาะ EE คลาดเคลื่อน', col: '#D97706' },
+        { code: '03', title: 'STANDARDIZATION SPEED', val: 200, pct: 0.17, sub: 'ลดเวลารอตรวจ Cross-Check ก่อนผลิต', col: '#0284C7' }
       ];
       const dStartY = stageY + 148;
       const dGap = 12;
@@ -7483,24 +7390,24 @@
       drivers.forEach((dr, di) => {
         const dy = dStartY + di * (dH + dGap);
         const dp = easeOutCubic(clamp((localT - 0.5 - di * 0.45) / 1.5, 0, 1));
-        drawRoundedRect(bX, dy, bW, dH, 14, 'rgba(15, 23, 42, 0.62)', dr.col + '88', 1.3);
+        drawRoundedRect(bX, dy, bW, dH, 14, '#FFFFFF', dr.col + '66', 1.3);
 
-        drawRoundedRect(bX + 16, dy + 14, 34, 24, 6, dr.col + '2E', dr.col, 1);
-        ctx.fillStyle = '#FFFFFF';
-        fit(dr.code, bX + 33, dy + 30, 26, 11.5, '900', '"JetBrains Mono", monospace', 'center');
+        drawRoundedRect(bX + 16, dy + 14, 34, 24, 6, dr.col + '18', dr.col, 1);
+        ctx.fillStyle = dr.col;
+        fit(dr.code, bX + 33, dy + 30.5, 26, 13.5, '900', '"JetBrains Mono", monospace', 'center');
 
-        ctx.fillStyle = '#F8FAFC';
-        fit(dr.title, bX + 58, dy + 31, bW - 196, 13, '800', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = '#0F172A';
+        fit(dr.title, bX + 58, dy + 31.5, bW - 196, 15.5, '800', '"Prompt", sans-serif', 'left');
 
         ctx.fillStyle = dr.col;
-        fit(`+${Math.round(dr.val * dp)}K`, bX + bW - 18, dy + 32, 114, 18, '900', '"JetBrains Mono", monospace', 'right');
+        fit(`+${Math.round(dr.val * dp)}K`, bX + bW - 18, dy + 32, 114, 19, '900', '"JetBrains Mono", monospace', 'right');
 
-        ctx.fillStyle = '#CBD5E1';
-        fit(dr.sub, bX + 18, dy + 60, bW - 36, 13, '500', '"Prompt", sans-serif', 'left');
+        ctx.fillStyle = '#475569';
+        fit(dr.sub, bX + 18, dy + 61, bW - 36, 15.5, '500', '"Prompt", sans-serif', 'left');
 
         const dbW = bW - 36;
         const dbY = dy + dH - 22;
-        drawRoundedRect(bX + 18, dbY, dbW, 8, 4, 'rgba(255,255,255,0.12)', null, 0);
+        drawRoundedRect(bX + 18, dbY, dbW, 8, 4, '#E2E8F0', null, 0);
         drawRoundedRect(bX + 18, dbY, Math.max(8, dbW * dr.pct * dp), 8, 4, dr.col, null, 0);
       });
     }
@@ -7518,9 +7425,9 @@
       const isDone = clipIdx > si;
       const segFill = isDone ? 1 : (isCur ? clamp(localT / 5.0, 0, 1) : 0);
 
-      ctx.fillStyle = isCur ? '#FFFFFF' : (isDone ? '#6EE7B7' : '#94A3B8');
-      fit(lbl, sx, footY + 6, segW, 11.5, isCur ? '800' : '600', '"Prompt", sans-serif', 'left');
-      drawRoundedRect(sx, footY + 13, segW, 7, 3.5, 'rgba(255,255,255,0.12)', null, 0);
+      ctx.fillStyle = isCur ? '#0F172A' : (isDone ? '#059669' : '#64748B');
+      fit(lbl, sx, footY + 6, segW, 13.5, isCur ? '800' : '600', '"Prompt", sans-serif', 'left');
+      drawRoundedRect(sx, footY + 13, segW, 7, 3.5, '#E2E8F0', null, 0);
       if (segFill > 0) {
         drawRoundedRect(sx, footY + 13, Math.max(6, segW * segFill), 7, 3.5, isCur ? meta.accent : '#10B981', null, 0);
       }
@@ -7529,8 +7436,8 @@
 
     // Destination Pill: 5 OUTPUTS (รูปที่ 2)
     const destX = x + w - 224;
-    drawRoundedRect(destX, footY - 4, 202, 28, 14, clipT >= 13.5 ? '#10B981' : 'rgba(255,255,255,0.10)', '#10B981AA', 1.1);
-    ctx.fillStyle = clipT >= 13.5 ? '#052E24' : '#A7F3D0';
+    drawRoundedRect(destX, footY - 4, 202, 28, 14, clipT >= 13.5 ? '#059669' : '#ECFDF5', '#10B981', 1.1);
+    ctx.fillStyle = clipT >= 13.5 ? '#FFFFFF' : '#047857';
     fit('NEXT ➔ 5 OUTPUTS (รูปที่ 2)', destX + 101, footY + 14, 186, 11.5, '800', '"Prompt", sans-serif', 'center');
     app._v3ResultsHits.push({ x: destX, y: footY - 4, w: 202, h: 28, targetT: 15.05 });
 
@@ -7728,7 +7635,7 @@
     fit('RESULT  |  Auto BOM System Development', marginX, 68, 1380, 42, '800', '"Prompt", sans-serif', 'left');
 
     ctx.fillStyle = '#A7F3D0';
-    fit(':: End-to-End Value Creation from Design to Production & Installation', marginX, 104, 1380, 19, '500', '"Prompt", sans-serif', 'left');
+    fit(':: End-to-End Value Creation from Design to Production & Installation', marginX, 105, 1380, 21, '500', '"Prompt", sans-serif', 'left');
     ctx.restore();
 
     // 3. Left Column: 4 Clean Executive Value Pillar Cards (x = 56..644, y = 164..1008)
@@ -7746,15 +7653,21 @@
         badge: '7 Days ➔ 1 Day (-86%)',
         accent: '#D97706',
         soft: '#FFFBEB',
-        desc: 'ลดระยะเวลาจัดทำ BOM และ Shop Drawing จาก 7 วัน เหลือเพียง 1 วัน (~86%) ด้วยระบบคำนวณและขึ้นโมเดลอัตโนมัติ'
+        bullets: [
+          'ลดเวลา BOM & DWG 7 วัน ➔ 1 วัน',
+          'คำนวณ & ขึ้นโมเดล C75 อัตโนมัติ'
+        ]
       },
       {
         code: '02',
-        title: 'SKILL & KNOWLEDGE STANDARDIZATION',
+        title: 'SKILL & KNOWLEDGE STANDARD',
         badge: 'Logic Standard',
         accent: '#059669',
         soft: '#ECFDF5',
-        desc: 'เปลี่ยนองค์ความรู้เฉพาะบุคคลเป็น Logic และมาตรฐานในระบบ ลดการพึ่งพาทักษะและประสบการณ์รายบุคคลในการจัดทำ BOM ด้วยมือ'
+        bullets: [
+          'เปลี่ยนทักษะคน ➔ Logic มาตรฐาน',
+          'ลดการพึ่งพาบุคคล ทำงานเป็นระบบ'
+        ]
       },
       {
         code: '03',
@@ -7762,15 +7675,21 @@
         badge: 'Zero Rework',
         accent: '#2563EB',
         soft: '#EFF6FF',
-        desc: 'ลดขั้นตอนการทำงานซ้ำซ้อนด้วยมือ เพิ่มความแม่นยำและสม่ำเสมอของข้อมูลผ่าน Automation ลดโอกาสผิดพลาดก่อนส่งผลิตจริง'
+        bullets: [
+          'ตัดงาน Manual ซ้ำซ้อนด้วย Auto',
+          'ข้อมูลแม่นยำ 100% ลดของเสีย'
+        ]
       },
       {
         code: '04',
-        title: 'AUTOMATED OUTPUT & DATA INTEGRATION',
+        title: 'AUTO OUTPUT & DATA SYNC',
         badge: 'Single Model Sync',
         accent: '#4F46E5',
         soft: '#EEF2FF',
-        desc: 'เชื่อมการสร้าง 3D, 2D Assembly Drawing, CAD Punching, Job Order และ Part Items ให้เป็นกระบวนการเดียว พร้อมส่งต่อโรงงานผลิต'
+        bullets: [
+          'เชื่อม 3D · 2D · CNC · BOM จุดเดียว',
+          'ส่งตรงโรงงานผลิตทันทีในคลิกเดียว'
+        ]
       }
     ];
 
@@ -7797,26 +7716,33 @@
       ctx.fill();
 
       // Index Badge
-      drawRoundedRect(leftX + 24, py + 22, 42, 28, 8, p.soft, p.accent, 1.1);
+      drawRoundedRect(leftX + 24, py + 19, 48, 30, 8, p.soft, p.accent, 1.2);
       ctx.fillStyle = p.accent;
-      fit(p.code, leftX + 45, py + 41, 34, 13.5, '900', '"Prompt", sans-serif', 'center');
+      fit(p.code, leftX + 48, py + 40, 40, 16.5, '900', '"Prompt", sans-serif', 'center');
 
       // Right Meta Pill
-      const bW = p.badge.length > 16 ? 174 : 130;
-      drawRoundedRect(leftX + leftW - 22 - bW, py + 23, bW, 26, 13, p.soft, p.accent + '55', 1);
+      const bW = p.badge.length > 16 ? 206 : 164;
+      drawRoundedRect(leftX + leftW - 22 - bW, py + 20, bW, 28, 14, p.soft, p.accent + '55', 1);
       ctx.fillStyle = p.accent;
-      fit(p.badge, leftX + leftW - 22 - bW / 2, py + 40, bW - 14, 12, '800', '"Prompt", sans-serif', 'center');
+      fit(p.badge, leftX + leftW - 22 - bW / 2, py + 39.5, bW - 14, 15.5, '800', '"Prompt", sans-serif', 'center');
 
-      // Pillar Title (cleanly positioned below badge strip or beside badge with safe width)
+      // Pillar Title (Big Bold Heading)
       ctx.fillStyle = '#0F172A';
-      fit(p.title, leftX + 24, py + 80, leftW - 48, 19.5, '800', '"Prompt", sans-serif', 'left');
+      fit(p.title, leftX + 24, py + 84, leftW - 48, 26, '900', '"Prompt", sans-serif', 'left');
 
       // Subtle Hairline Divider
       ctx.fillStyle = '#E2E8F0';
-      ctx.fillRect(leftX + 24, py + 94, leftW - 48, 1.2);
+      ctx.fillRect(leftX + 24, py + 99, leftW - 48, 1.2);
 
-      // Clean Multi-Line Wrapped Thai Description (ZERO squishing!)
-      drawWrappedThai(p.desc, leftX + 24, py + 120, leftW - 48, 16, 25, '#334155', '400');
+      // 2 Punchy Key-Topic Bullets (Big & Clear!)
+      p.bullets.forEach((bLine, bi) => {
+        const by = py + 133 + bi * 38;
+        ctx.fillStyle = p.accent;
+        ctx.font = '900 25px "Prompt", sans-serif';
+        ctx.fillText('•', leftX + 24, by);
+        ctx.fillStyle = '#0F172A';
+        fit(bLine, leftX + 48, by, leftW - 72, 24, '700', '"Prompt", sans-serif', 'left');
+      });
 
       ctx.restore();
     });
@@ -7843,13 +7769,14 @@
       const isPlayingThis = inClipSequence && clipPhaseIdx === idx;
       if (isPlayingThis) {
         const rem = Math.max(0, (idx + 1) * 5.0 - t).toFixed(1);
-        drawRoundedRect(slotX, kpiY + liftY + 18, slotW, 26, 13, '#10B981', '#6EE7B7', 1.1);
-        ctx.fillStyle = '#052E24';
-        fit(`▶ CLIP · ${rem}s`, slotX + slotW / 2, kpiY + liftY + 35, slotW - 10, 11, '900', '"JetBrains Mono", monospace', 'center');
+        const tagBg = activeColor === '#F59E0B' ? '#D97706' : '#059669';
+        drawRoundedRect(slotX, kpiY + liftY + 18, slotW, 26, 13, tagBg, tagBg, 1.1);
+        ctx.fillStyle = '#FFFFFF';
+        fit(`▶ CLIP · ${rem}s`, slotX + slotW / 2, kpiY + liftY + 35.5, slotW - 10, 13, '900', '"JetBrains Mono", monospace', 'center');
       } else {
         drawRoundedRect(slotX, kpiY + liftY + 18, slotW, 26, 13, isDarkCard ? 'rgba(255,255,255,0.08)' : '#F1F5F9', isDarkCard ? 'rgba(255,255,255,0.2)' : '#CBD5E1', 1);
         ctx.fillStyle = isDarkCard ? '#A7F3D0' : '#64748B';
-        fit(`▶ Clip 0${idx + 1}`, slotX + slotW / 2, kpiY + liftY + 35, slotW - 10, 11, '700', '"Prompt", sans-serif', 'center');
+        fit(`▶ Clip 0${idx + 1}`, slotX + slotW / 2, kpiY + liftY + 35.5, slotW - 10, 13, '700', '"Prompt", sans-serif', 'center');
       }
     };
 
@@ -7864,10 +7791,10 @@
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    drawRoundedRect(k1X + 24, kpiY + k1Lift + 18, 178, 26, 13, '#ECFDF5', '#05966955', 1);
+    drawRoundedRect(k1X + 24, kpiY + k1Lift + 18, 198, 26, 13, '#ECFDF5', '#05966955', 1);
     ctx.fillStyle = '#047857';
-    fit('LEAD TIME REDUCTION', k1X + 113, kpiY + k1Lift + 35, 160, 11.5, '800', '"Prompt", sans-serif', 'center');
-    drawKpiPlayTag(k1X, k1Lift, 0, 202, false, '#10B981');
+    fit('LEAD TIME REDUCTION', k1X + 123, kpiY + k1Lift + 35.5, 182, 13.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k1X, k1Lift, 0, 222, false, '#10B981');
     app._v3ResultsHits.push({ x: k1X, y: kpiY, w: colW, h: kpiH, targetT: 0.05 });
 
     // Rolling countdown 7 -> 1 on slide entrance
@@ -7912,7 +7839,7 @@
     ctx.restore();
 
     ctx.fillStyle = '#475569';
-    fit('ลดระยะเวลาจัดทำ BOM & Drawing', k1X + 24, kpiY + k1Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+    fit('ลดระยะเวลาจัดทำ BOM & Drawing', k1X + 24, kpiY + k1Lift + 162, barW1, 19, '700', '"Prompt", sans-serif', 'left');
 
     // KPI Card 2: Cycle Time Saved (0% -> 86% · Live Photon Runner + Floating Arrow)
     const k2X = rightX + colW + rightGap;
@@ -7925,10 +7852,10 @@
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    drawRoundedRect(k2X + 24, kpiY + k2Lift + 18, 168, 26, 13, '#FFFBEB', '#D9770655', 1);
+    drawRoundedRect(k2X + 24, kpiY + k2Lift + 18, 184, 26, 13, '#FFFBEB', '#D9770655', 1);
     ctx.fillStyle = '#B45309';
-    fit('CYCLE TIME SAVED', k2X + 108, kpiY + k2Lift + 35, 150, 11.5, '800', '"Prompt", sans-serif', 'center');
-    drawKpiPlayTag(k2X, k2Lift, 1, 192, false, '#F59E0B');
+    fit('CYCLE TIME SAVED', k2X + 116, kpiY + k2Lift + 35.5, 168, 13.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k2X, k2Lift, 1, 208, false, '#F59E0B');
     app._v3ResultsHits.push({ x: k2X, y: kpiY, w: colW, h: kpiH, targetT: 5.05 });
 
     const pctRollP = easeOutCubic((t - 0.30) / 1.35);
@@ -7941,7 +7868,7 @@
     const bobY = Math.sin(nowSec * 5.0) * 2.2;
     drawRoundedRect(k2X + 188, kpiY + k2Lift + 72, 166, 36, 10, '#ECFDF5', '#10B98166', 1.1);
     ctx.fillStyle = '#059669';
-    fit('▼ Faster Output', k2X + 271, kpiY + k2Lift + 95 + bobY * 0.4, 148, 13.5, '800', '"Prompt", sans-serif', 'center');
+    fit('▼ Faster Output', k2X + 271, kpiY + k2Lift + 95 + bobY * 0.4, 150, 15.5, '800', '"Prompt", sans-serif', 'center');
 
     // Efficiency Progress Bar (0 -> 86%) + racing photon runner
     const barY2 = kpiY + k2Lift + 132;
@@ -7963,18 +7890,18 @@
     ctx.restore();
 
     ctx.fillStyle = '#475569';
-    fit('ประหยัดเวลากระบวนการออกแบบรวม', k2X + 24, kpiY + k2Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+    fit('ประหยัดเวลากระบวนการออกแบบรวม', k2X + 24, kpiY + k2Lift + 162, barW1, 19, '700', '"Prompt", sans-serif', 'left');
 
-    // KPI Card 3: Annual Cost Reduction (0.0M -> 1.2M · Evergreen Sheen & ROI Photon)
+    // KPI Card 3: Annual Cost Reduction (0.0M -> 1.2M · Clean White & Mint Sheen)
     const k3X = rightX + (colW + rightGap) * 2;
     const k3Lift = activeKpi === 2 ? -3 : 0;
-    ctx.shadowColor = activeKpi === 2 ? 'rgba(52, 211, 153, 0.28)' : 'rgba(15, 23, 42, 0.14)';
-    ctx.shadowBlur = activeKpi === 2 ? 24 : 18;
-    ctx.shadowOffsetY = activeKpi === 2 ? 9 : 8;
+    ctx.shadowColor = activeKpi === 2 ? 'rgba(5, 150, 105, 0.22)' : 'rgba(15, 23, 42, 0.08)';
+    ctx.shadowBlur = activeKpi === 2 ? 22 : 16;
+    ctx.shadowOffsetY = activeKpi === 2 ? 8 : 6;
     const costGrad = ctx.createLinearGradient(k3X, kpiY + k3Lift, k3X + colW, kpiY + k3Lift + kpiH);
-    costGrad.addColorStop(0, '#0F2E25');
-    costGrad.addColorStop(1, '#1A4B3D');
-    drawRoundedRect(k3X, kpiY + k3Lift, colW, kpiH, 16, costGrad, activeKpi === 2 ? '#6EE7B7' : '#34D39966', activeKpi === 2 ? 2.0 : 1.4);
+    costGrad.addColorStop(0, '#FFFFFF');
+    costGrad.addColorStop(1, '#F0FDF4');
+    drawRoundedRect(k3X, kpiY + k3Lift, colW, kpiH, 16, costGrad, activeKpi === 2 ? '#10B981' : '#CBD5E1', activeKpi === 2 ? 2.0 : 1.2);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
@@ -7988,58 +7915,62 @@
     const sheenProg = (nowSec * 0.42) % 1;
     const sheenX = k3X - 140 + (colW + 280) * sheenProg;
     const sGrad = ctx.createLinearGradient(sheenX, kpiY, sheenX + 110, kpiY + kpiH);
-    sGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    sGrad.addColorStop(0.5, 'rgba(110, 231, 183, 0.11)');
-    sGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    sGrad.addColorStop(0, 'rgba(16, 185, 129, 0)');
+    sGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.08)');
+    sGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
     ctx.fillStyle = sGrad;
     ctx.fillRect(k3X, kpiY + k3Lift, colW, kpiH);
     ctx.restore();
 
-    drawRoundedRect(k3X + 24, kpiY + k3Lift + 18, 206, 26, 13, 'rgba(52, 211, 153, 0.18)', 'rgba(52, 211, 153, 0.48)', 1);
-    ctx.fillStyle = '#6EE7B7';
-    fit('ANNUAL COST REDUCTION', k3X + 127, kpiY + k3Lift + 35, 188, 11.5, '800', '"Prompt", sans-serif', 'center');
-    drawKpiPlayTag(k3X, k3Lift, 2, 230, true, '#34D399');
+    drawRoundedRect(k3X + 24, kpiY + k3Lift + 18, 224, 26, 13, '#ECFDF5', '#05966955', 1);
+    ctx.fillStyle = '#047857';
+    fit('ANNUAL COST REDUCTION', k3X + 136, kpiY + k3Lift + 35.5, 208, 13.5, '800', '"Prompt", sans-serif', 'center');
+    drawKpiPlayTag(k3X, k3Lift, 2, 248, false, '#059669');
     app._v3ResultsHits.push({ x: k3X, y: kpiY, w: colW, h: kpiH, targetT: 10.05 });
 
     // Rolling counter 0.0M -> 1.2M
     const costRollP = easeOutCubic((t - 0.35) / 1.40);
     const costValStr = `${(1.2 * costRollP).toFixed(1)}M`;
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#0F172A';
     ctx.font = '900 54px "Prompt", sans-serif';
     ctx.fillText(costValStr, k3X + 24, kpiY + k3Lift + 112);
 
     // Inline THB / YEAR pill matching Card 2 layout rhythm
     const costBob = Math.sin(nowSec * 4.5 + 1.2) * 2.0;
-    drawRoundedRect(k3X + 190, kpiY + k3Lift + 72, 164, 36, 10, 'rgba(16, 185, 129, 0.22)', 'rgba(110, 231, 183, 0.50)', 1.1);
-    ctx.fillStyle = '#A7F3D0';
-    fit('THB / YEAR', k3X + 272, kpiY + k3Lift + 95 + costBob * 0.35, 144, 13.5, '800', '"JetBrains Mono", monospace', 'center');
+    drawRoundedRect(k3X + 190, kpiY + k3Lift + 72, 164, 36, 10, '#ECFDF5', '#10B98166', 1.1);
+    ctx.fillStyle = '#047857';
+    fit('THB / YEAR', k3X + 272, kpiY + k3Lift + 95 + costBob * 0.35, 148, 15.5, '800', '"JetBrains Mono", monospace', 'center');
 
     // Continuous ROI energy track with glowing gold-mint photon
     const barY3 = kpiY + k3Lift + 132;
-    drawRoundedRect(k3X + 24, barY3, barW1, 8, 4, 'rgba(255, 255, 255, 0.14)', null, 0);
+    drawRoundedRect(k3X + 24, barY3, barW1, 8, 4, '#E2E8F0', null, 0);
     const roiGrad = ctx.createLinearGradient(k3X + 24, 0, k3X + 24 + barW1, 0);
-    roiGrad.addColorStop(0, '#10B981');
-    roiGrad.addColorStop(1, '#FBBF24');
+    roiGrad.addColorStop(0, '#059669');
+    roiGrad.addColorStop(1, '#10B981');
     drawRoundedRect(k3X + 24, barY3, Math.max(10, barW1 * costRollP), 8, 4, roiGrad, null, 0);
 
     const run3X = k3X + 24 + barW1 * costRollP * ((nowSec * 0.95) % 1);
     ctx.save();
-    ctx.fillStyle = '#FDE68A';
-    ctx.shadowColor = '#FBBF24';
-    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#D97706';
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = 'rgba(217, 119, 6, 0.45)';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(run3X, barY3 + 4, 4.5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-    fit('ลดต้นทุนแรงงานและการแก้ไขแบบต่อปี', k3X + 24, kpiY + k3Lift + 160, barW1, 14.5, '500', '"Prompt", sans-serif', 'left');
+    ctx.fillStyle = '#475569';
+    fit('ลดต้นทุนแรงงานและการแก้ไขแบบต่อปี', k3X + 24, kpiY + k3Lift + 162, barW1, 19, '700', '"Prompt", sans-serif', 'left');
     ctx.restore();
 
     // 5. Right Lower Section: Synchronized 3x5s Animated Clips (0..15s) -> Pinned 5 Deliverable Gallery (>= 15s)
     if (inClipSequence) {
       // Connector beam linking the active KPI Card (7->1d / 86% / 1.2M) into the large clip viewport
-      const connCols = ['#10B981', '#F59E0B', '#34D399'];
+      const connCols = ['#059669', '#D97706', '#059669'];
       const connCol = connCols[clipPhaseIdx];
       const connX = rightX + clipPhaseIdx * (colW + rightGap) + colW / 2;
       ctx.save();
@@ -8073,17 +8004,17 @@
 
     const hdrTxtCol = (pal && pal.isDark) ? '#E2E8F0' : '#0F2922';
     ctx.fillStyle = hdrTxtCol;
-    fit('AUTOMATED OUTPUT DELIVERABLES — 5 ผลผลิตอัตโนมัติจาก Single Model', rightX, 382, 780, 15.5, '800', '"Prompt", sans-serif', 'left');
+    fit('AUTOMATED OUTPUT DELIVERABLES — 5 ผลผลิตอัตโนมัติจาก Single Model', rightX, 383, 790, 20, '800', '"Prompt", sans-serif', 'left');
 
     // Clickable Replay 15s Clips button beside 100% MODEL SYNC badge
     drawRoundedRect(rightX + 804, 362, 168, 26, 13, (pal && pal.isDark) ? 'rgba(56, 189, 248, 0.16)' : '#E0F2FE', '#0284C766', 1);
     ctx.fillStyle = (pal && pal.isDark) ? '#7DD3FC' : '#0369A1';
-    fit('↻ เล่นคลิป 15s ซ้ำ', rightX + 888, 379, 152, 11.5, '800', '"Prompt", sans-serif', 'center');
+    fit('↻ เล่นคลิป 15s ซ้ำ', rightX + 888, 379.5, 152, 13.5, '800', '"Prompt", sans-serif', 'center');
     app._v3ResultsHits.push({ x: rightX + 804, y: 358, w: 168, h: 34, targetT: 0.05 });
 
     drawRoundedRect(rightX + 984, 362, 200, 26, 13, (pal && pal.isDark) ? 'rgba(16, 185, 129, 0.18)' : '#D1FAE5', '#05966955', 1);
     ctx.fillStyle = (pal && pal.isDark) ? '#6EE7B7' : '#065F46';
-    fit('✓ 100% MODEL SYNC', rightX + 1084, 379, 180, 11.5, '800', '"Prompt", sans-serif', 'center');
+    fit('✓ 100% MODEL SYNC', rightX + 1084, 379.5, 184, 13.5, '800', '"Prompt", sans-serif', 'center');
 
     function drawCleanOutputCard(x, y, w, h, code, labelText, subTag, imgList, accent) {
       ctx.save();
@@ -8141,18 +8072,18 @@
       ctx.fillRect(x + 1, fy, w - 2, 1.2);
 
       // Step Code Pill
-      drawRoundedRect(x + 14, fy + 11, 34, 26, 7, accent + '1A', accent + '66', 1);
+      drawRoundedRect(x + 12, fy + 10, 38, 28, 7, accent + '1A', accent + '66', 1);
       ctx.fillStyle = accent;
-      fit(code, x + 31, fy + 29, 28, 12, '900', '"Prompt", sans-serif', 'center');
+      fit(code, x + 31, fy + 29.5, 32, 14, '900', '"Prompt", sans-serif', 'center');
 
       // Title
       ctx.fillStyle = '#0F172A';
-      fit(labelText, x + 58, fy + 29, w - (subTag ? 174 : 74), 15.5, '800', '"Prompt", sans-serif', 'left');
+      fit(labelText, x + 58, fy + 30, w - (subTag ? 184 : 74), 20, '800', '"Prompt", sans-serif', 'left');
 
       // Subtle Format Sub-Tag on Right
       if (subTag) {
         ctx.fillStyle = '#64748B';
-        fit(subTag, x + w - 14, fy + 28, 108, 11.5, '700', '"JetBrains Mono", monospace', 'right');
+        fit(subTag, x + w - 12, fy + 29, 118, 13.5, '700', '"JetBrains Mono", monospace', 'right');
       }
       ctx.restore();
     }
@@ -8178,8 +8109,7 @@
 
   function drawSlide14NextStepScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+    const { isSettled, t } = getCappedMotion(app);
 
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     function easeOutCubic(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
@@ -8301,25 +8231,26 @@
     ctx.lineTo(cardLX + 245, cardLY + 52);
     ctx.stroke();
 
-    // Objective: BOM & DWG Auto, Job & Production Order, 3D, Tempo. Board, Lantex,       Check Conflict , Error, Sync, Logic, CR Comparison
-    ctx.font = '700 17px "Prompt", sans-serif';
-    ctx.fillText('Objective:', cardLX + 45, cardLY + 82);
-    ctx.font = '400 17px "Prompt", sans-serif';
-    ctx.fillStyle = '#26332c';
-    ctx.fillText('BOM & DWG Auto, Job & Production Order, 3D, Tempo. Board, Lantex,', cardLX + 135, cardLY + 82);
-    ctx.fillText('Check Conflict , Error, Sync, Logic, CR Comparison', cardLX + 840, cardLY + 82);
-
-    // Pain Point: ระบบเดิมต้องกรอก Manual ใช้เวลา ความเสี่ยงผิดพลาดสูง
+    // Objective: Concise Key Headings (big bold & clear)
+    ctx.font = '800 21px "Prompt", sans-serif';
     ctx.fillStyle = '#0f1714';
-    ctx.font = '700 17px "Prompt", sans-serif';
-    ctx.fillText('Pain Point:', cardLX + 45, cardLY + 112);
-    ctx.fillText('ระบบเดิมต้องกรอก Manual ใช้เวลา ความเสี่ยงผิดพลาดสูง', cardLX + 145, cardLY + 112);
+    ctx.fillText('Objective:', cardLX + 45, cardLY + 82);
+    ctx.fillStyle = '#1e293b';
+    app.fillFittedText(ctx, 'Auto BOM & DWG · 3D · Job Order · Lantex CNC & Check Conflict', cardLX + 165, cardLY + 82, 1150, 20.5, '600', '"Prompt", sans-serif', 'left');
 
-    // Action: กำหนด Logic/Database/สร้าง object เขียนโปรแกรมบน Sketchup
-    ctx.fillText('Action:', cardLX + 45, cardLY + 142);
-    ctx.font = '400 17px "Prompt", sans-serif';
-    ctx.fillStyle = '#26332c';
-    ctx.fillText('กำหนด Logic/Database/สร้าง object เขียนโปรแกรมบน Sketchup', cardLX + 115, cardLY + 142);
+    // Pain Point: Concise Key Heading
+    ctx.fillStyle = '#0f1714';
+    ctx.font = '800 21px "Prompt", sans-serif';
+    ctx.fillText('Pain Point:', cardLX + 45, cardLY + 116);
+    ctx.fillStyle = '#b91c1c';
+    app.fillFittedText(ctx, 'ระบบเดิมกรอก Manual ช้า และเสี่ยงผิดพลาดสูง', cardLX + 168, cardLY + 116, 1140, 20.5, '700', '"Prompt", sans-serif', 'left');
+
+    // Action: Concise Key Heading
+    ctx.fillStyle = '#0f1714';
+    ctx.font = '800 21px "Prompt", sans-serif';
+    ctx.fillText('Action:', cardLX + 45, cardLY + 150);
+    ctx.fillStyle = '#047857';
+    app.fillFittedText(ctx, 'วาง Logic / Database / Object เขียนโปรแกรมบน SketchUp', cardLX + 132, cardLY + 150, 1180, 20.5, '700', '"Prompt", sans-serif', 'left');
 
     // 6 Modules Grid
     const mods = [
@@ -8342,8 +8273,8 @@
       ctx.fillText(m.t1, m.x + m.w / 2, m.y + m.h + 24);
       if (m.t2) {
         ctx.fillStyle = '#4b5563';
-        ctx.font = '500 16px "Prompt", sans-serif';
-        ctx.fillText(m.t2, m.x + m.w / 2, m.y + m.h + 48);
+        ctx.font = '500 18px "Prompt", sans-serif';
+        ctx.fillText(m.t2, m.x + m.w / 2, m.y + m.h + 50);
       }
       ctx.textAlign = 'left';
     });
@@ -8363,21 +8294,18 @@
     // =========================================================================
     const p1Y = cardRY + 56;
     ctx.fillStyle = '#0f1714';
-    ctx.font = '800 26px "Prompt", sans-serif';
+    ctx.font = '800 28px "Prompt", sans-serif';
     ctx.fillText('01 | Smart Estimation', cardRX + 32, p1Y);
-    ctx.fillText('for Sales', cardRX + 32, p1Y + 34);
+    ctx.fillText('for Sales', cardRX + 32, p1Y + 35);
 
-    // Pillar 1 Body Text
-    wrapThaiText(
-      ctx,
-      'ขยายระบบสู่การประเมินราคา (Estimate) เพื่อให้ทีมขายสามารถเสนอราคาได้รวดเร็วและตอบโจทย์ความต้องการของลูกค้าได้ทันที',
-      cardRX + 32,
-      p1Y + 76,
-      cardRW - 64,
-      27,
-      '400 17.5px "Prompt", sans-serif',
-      '#374151'
-    );
+    // Pillar 1 Key Topic Bullets (Big & Clear)
+    ctx.fillStyle = '#059669';
+    ctx.font = '900 23px "Prompt", sans-serif';
+    ctx.fillText('•', cardRX + 32, p1Y + 86);
+    ctx.fillText('•', cardRX + 32, p1Y + 124);
+    ctx.fillStyle = '#0f172a';
+    app.fillFittedText(ctx, 'ประเมินราคา (Estimate) อัตโนมัติ', cardRX + 54, p1Y + 86, cardRW - 86, 22.5, '700', '"Prompt", sans-serif', 'left');
+    app.fillFittedText(ctx, 'เสนอราคาไว ตอบโจทย์ลูกค้าทันที', cardRX + 54, p1Y + 124, cardRW - 86, 22.5, '700', '"Prompt", sans-serif', 'left');
 
     // --- CLIP 1: Live Animated Smart Estimation for Sales Screen (y = 352, h = 176) ---
     const clip1X = cardRX + 28, clip1Y = cardRY + 206, clip1W = cardRW - 56, clip1H = 176;
@@ -8399,30 +8327,30 @@
     ctx.fillStyle = '#10b981';
     if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(clip1X + 38, clip1Y + 13, 4, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = '#e2e8f0';
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('SMART ESTIMATION · SALES QUOTATION', clip1X + 52, clip1Y + 17);
-    const blink1 = Math.sin(nowSec * 5) > 0;
+    app.fillFittedText(ctx, 'SMART ESTIMATION · SALES QUOTATION', clip1X + 48, clip1Y + 17.5, clip1W - 110, 12.5, '700', '"Prompt", sans-serif', 'left');
+    const blink1 = isSettled || Math.sin(t * 5) > 0;
     ctx.fillStyle = blink1 ? '#10b981' : '#64748b';
-    if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(clip1X + clip1W - 44, clip1Y + 13, 3.5, 0, Math.PI * 2); ctx.fill(); }
+    if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(clip1X + clip1W - 50, clip1Y + 13, 3.5, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = '#34d399';
-    ctx.fillText('LIVE', clip1X + clip1W - 35, clip1Y + 17);
+    ctx.font = '700 12px "Prompt", sans-serif';
+    ctx.fillText(isSettled ? 'DONE' : 'LIVE', clip1X + clip1W - 41, clip1Y + 17.5);
 
-    // Left: 3D Floorplan / Model Preview with animated laser scan
+    // Left: 3D Floorplan / Model Preview with animated laser scan (scan stops at 10s)
     const fpBoxX = clip1X + 10, fpBoxY = clip1Y + 34, fpBoxW = 148, fpBoxH = 132;
     drawRoundedRect(fpBoxX, fpBoxY, fpBoxW, fpBoxH, 10, '#162436', '#334155', 1.2);
     const mod1Img = loadImage('assets/ver3/next_step/mod1_interior.png');
     if (mod1Img && mod1Img.complete && mod1Img.naturalWidth && typeof ctx.drawImage === 'function') {
       ctx.drawImage(mod1Img, fpBoxX + 6, fpBoxY + 6, fpBoxW - 12, fpBoxH - 32);
     }
-    // Animated Horizontal Laser Scan Line across 3D model
-    const scan1Y = fpBoxY + 10 + ((nowSec * 45) % (fpBoxH - 42));
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.28)';
-    ctx.fillRect(fpBoxX + 4, scan1Y - 6, fpBoxW - 8, 8);
-    ctx.fillStyle = '#34d399';
-    ctx.fillRect(fpBoxX + 4, scan1Y, fpBoxW - 8, 2);
+    if (!isSettled) {
+      const scan1Y = fpBoxY + 10 + ((t * 45) % (fpBoxH - 42));
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.28)';
+      ctx.fillRect(fpBoxX + 4, scan1Y - 6, fpBoxW - 8, 8);
+      ctx.fillStyle = '#34d399';
+      ctx.fillRect(fpBoxX + 4, scan1Y, fpBoxW - 8, 2);
+    }
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '600 10px "Prompt", sans-serif';
-    ctx.fillText('Model: HEIM-285 sqm', fpBoxX + 10, fpBoxY + fpBoxH - 9);
+    app.fillFittedText(ctx, 'Model: HEIM-285 sqm', fpBoxX + 8, fpBoxY + fpBoxH - 8.5, fpBoxW - 16, 12, '600', '"Prompt", sans-serif', 'left');
 
     // Right: Real-time Cost Breakdown & Instant Quote Total
     const estX = fpBoxX + fpBoxW + 10, estW = clip1W - fpBoxW - 30;
@@ -8433,15 +8361,11 @@
     ];
     estItems.forEach((it, idx) => {
       const iy = fpBoxY + 4 + idx * 30;
-      const animP = 0.75 + 0.25 * Math.sin(nowSec * 2.5 + idx);
+      const animP = isSettled ? 1 : (0.75 + 0.25 * Math.sin(t * 2.5 + idx));
       ctx.fillStyle = '#cbd5e1';
-      ctx.font = '600 10.5px "Prompt", sans-serif';
-      ctx.fillText(it.label, estX, iy + 10);
+      app.fillFittedText(ctx, it.label, estX, iy + 10.5, estW - 76, 12.5, '600', '"Prompt", sans-serif', 'left');
       ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 10.5px "Prompt", sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('฿' + it.val, estX + estW, iy + 10);
-      ctx.textAlign = 'left';
+      app.fillFittedText(ctx, '฿' + it.val, estX + estW, iy + 10.5, 74, 12.5, '700', '"Prompt", sans-serif', 'right');
       // Progress bar
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(estX, iy + 15, estW, 5);
@@ -8451,14 +8375,13 @@
 
     // Instant Total Quote Badge
     const totBoxY = fpBoxY + 94;
-    drawRoundedRect(estX, totBoxY, estW, 38, 8, 'rgba(16, 185, 129, 0.18)', '#10b981', 1.5);
+    drawRoundedRect(estX, totBoxY, estW, 40, 8, 'rgba(16, 185, 129, 0.18)', '#10b981', 1.5);
     ctx.fillStyle = '#6ee7b7';
-    ctx.font = '700 9.5px "Prompt", sans-serif';
-    ctx.fillText('INSTANT ESTIMATE (≤ 5 MIN)', estX + 8, totBoxY + 13);
-    const livePrice = 5520000 + Math.floor(((nowSec * 1.2) % 3) * 10000);
+    app.fillFittedText(ctx, 'INSTANT ESTIMATE (≤ 5 MIN)', estX + 8, totBoxY + 14, estW - 16, 11.5, '700', '"Prompt", sans-serif', 'left');
+    const livePrice = isSettled ? 5520000 : (5520000 + Math.floor(((t * 1.2) % 3) * 10000));
     ctx.fillStyle = '#ffffff';
-    ctx.font = '800 14.5px "Prompt", sans-serif';
-    ctx.fillText('฿ ' + livePrice.toLocaleString('en-US'), estX + 8, totBoxY + 31);
+    ctx.font = '800 17px "Prompt", sans-serif';
+    ctx.fillText('฿ ' + livePrice.toLocaleString('en-US'), estX + 8, totBoxY + 34);
     ctx.restore();
 
     // Elegant Divider Line
@@ -8476,21 +8399,18 @@
     // =========================================================================
     const p2Y = cardRY + 436;
     ctx.fillStyle = '#0f1714';
-    ctx.font = '800 26px "Prompt", sans-serif';
+    ctx.font = '800 28px "Prompt", sans-serif';
     ctx.fillText('02 | Design-to-Production', cardRX + 32, p2Y);
-    ctx.fillText('Automation', cardRX + 32, p2Y + 34);
+    ctx.fillText('Automation', cardRX + 32, p2Y + 35);
 
-    // Pillar 2 Body Text
-    wrapThaiText(
-      ctx,
-      'พัฒนาระบบ Automation ที่เชื่อมโยงข้อมูลตั้งแต่การออกแบบไปจนถึง BOM, Drawing และ Production โดยตรวจสอบความสอดคล้องของข้อมูลและลด Design Conflict ตั้งแต่ต้นทาง ก่อนส่งต่อสู่กระบวนการผลิต',
-      cardRX + 32,
-      p2Y + 74,
-      cardRW - 64,
-      26,
-      '400 17px "Prompt", sans-serif',
-      '#374151'
-    );
+    // Pillar 2 Key Topic Bullets (Big & Clear)
+    ctx.fillStyle = '#d97706';
+    ctx.font = '900 23px "Prompt", sans-serif';
+    ctx.fillText('•', cardRX + 32, p2Y + 86);
+    ctx.fillText('•', cardRX + 32, p2Y + 124);
+    ctx.fillStyle = '#0f172a';
+    app.fillFittedText(ctx, 'เชื่อม 3D ➔ BOM ➔ DWG ➔ ผลิต', cardRX + 54, p2Y + 86, cardRW - 86, 22.5, '700', '"Prompt", sans-serif', 'left');
+    app.fillFittedText(ctx, 'ตรวจ Design Conflict ตั้งแต่ต้นทาง', cardRX + 54, p2Y + 124, cardRW - 86, 22.5, '700', '"Prompt", sans-serif', 'left');
 
     // --- CLIP 2: Live Animated Design-to-Production & Conflict Check Screen (y = 774, h = 248) ---
     const clip2X = cardRX + 28, clip2Y = cardRY + 628, clip2W = cardRW - 56, clip2H = 250;
@@ -8512,16 +8432,16 @@
     ctx.fillStyle = '#10b981';
     if (typeof ctx.beginPath === 'function') { ctx.beginPath(); ctx.arc(clip2X + 38, clip2Y + 13, 4, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = '#e2e8f0';
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.fillText('DESIGN ➔ BOM ➔ DWG ➔ PRODUCTION', clip2X + 52, clip2Y + 17);
+    app.fillFittedText(ctx, 'DESIGN ➔ BOM ➔ DWG ➔ PRODUCTION', clip2X + 48, clip2Y + 17.5, clip2W - 102, 12.5, '700', '"Prompt", sans-serif', 'left');
     ctx.fillStyle = '#fbbf24';
-    ctx.fillText('AUTO', clip2X + clip2W - 38, clip2Y + 17);
+    ctx.font = '800 12px "Prompt", sans-serif';
+    ctx.fillText('AUTO', clip2X + clip2W - 44, clip2Y + 17.5);
 
-    // Top Row inside Clip 2: 4-Stage Pipeline Flow with Moving Orb
+    // Top Row inside Clip 2: 4-Stage Pipeline Flow with Moving Orb (stops cleanly at 10s)
     const stgLabels = ['3D Design', 'Auto BOM', '2D DWG', 'Production'];
     const stgCols = ['#38bdf8', '#10b981', '#a78bfa', '#f59e0b'];
     const stgW = 80, stgGap = 15, stgStartX = clip2X + 12, stgY = clip2Y + 36;
-    const activeStg = Math.floor((nowSec * 1.4) % 4);
+    const activeStg = isSettled ? 3 : Math.floor((t * 1.4) % 4);
 
     // Connecting line behind stages
     ctx.strokeStyle = '#334155';
@@ -8532,13 +8452,15 @@
       ctx.lineTo(stgStartX + 3 * (stgW + stgGap) + 40, stgY + 16);
       ctx.stroke();
     }
-    // Traveling data pulse across the 4 stages
-    const orbX = stgStartX + 20 + (((nowSec * 0.65) % 1) * (3 * (stgW + stgGap) + 40));
-    ctx.fillStyle = '#34d399';
-    if (typeof ctx.beginPath === 'function') {
-      ctx.beginPath();
-      ctx.arc(orbX, stgY + 16, 5, 0, Math.PI * 2);
-      ctx.fill();
+    // Traveling data pulse across the 4 stages (hidden after 10s)
+    if (!isSettled) {
+      const orbX = stgStartX + 20 + (((t * 0.65) % 1) * (3 * (stgW + stgGap) + 40));
+      ctx.fillStyle = '#34d399';
+      if (typeof ctx.beginPath === 'function') {
+        ctx.beginPath();
+        ctx.arc(orbX, stgY + 16, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     stgLabels.forEach((lb, i) => {
@@ -8546,14 +8468,11 @@
       const isAct = i === activeStg;
       drawRoundedRect(sx, stgY, stgW, 32, 8, isAct ? stgCols[i] : '#1e293b', stgCols[i], isAct ? 2 : 1.2);
       ctx.fillStyle = isAct ? '#0f172a' : '#e2e8f0';
-      ctx.font = (isAct ? '800 ' : '600 ') + '10.5px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(lb, sx + stgW / 2, stgY + 20);
-      ctx.textAlign = 'left';
+      app.fillFittedText(ctx, lb, sx + stgW / 2, stgY + 20.5, stgW - 8, 12.5, isAct ? '800' : '600', '"Prompt", sans-serif', 'center');
     });
 
-    // Middle-Bottom inside Clip 2: Live 6-Module Conflict Check & 3D Preview
-    const cycIdx = Math.floor((nowSec * 0.8) % mods.length);
+    // Middle-Bottom inside Clip 2: Live 6-Module Conflict Check & 3D Preview (stops on mod 0 after 10s)
+    const cycIdx = isSettled ? 0 : Math.floor((t * 0.8) % mods.length);
     const curMod = mods[cycIdx];
     const modPreviewX = clip2X + 12, modPreviewY = clip2Y + 78, modPreviewW = 162, modPreviewH = 132;
     drawRoundedRect(modPreviewX, modPreviewY, modPreviewW, modPreviewH, 10, '#f8fafc', '#38bdf8', 1.5);
@@ -8562,10 +8481,7 @@
       app.drawMediaContain(ctx, curModIm, curModIm.naturalWidth, curModIm.naturalHeight, modPreviewX + 6, modPreviewY + 6, modPreviewW - 12, modPreviewH - 30);
     }
     ctx.fillStyle = '#0f172a';
-    ctx.font = '700 10px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(curMod.t1, modPreviewX + modPreviewW / 2, modPreviewY + modPreviewH - 8);
-    ctx.textAlign = 'left';
+    app.fillFittedText(ctx, curMod.t1, modPreviewX + modPreviewW / 2, modPreviewY + modPreviewH - 7.5, modPreviewW - 12, 12.5, '700', '"Prompt", sans-serif', 'center');
 
     // Right side of Clip 2: 6 Module Sync Checklist
     const chkX = modPreviewX + modPreviewW + 10, chkW = clip2W - modPreviewW - 34;
@@ -8584,21 +8500,17 @@
         drawRoundedRect(chkX, my, chkW, 20, 5, 'rgba(16, 185, 129, 0.22)', '#10b981', 1);
       }
       ctx.fillStyle = '#10b981';
-      ctx.font = '800 10.5px "Prompt", sans-serif';
-      ctx.fillText('✓', chkX + 6, my + 14);
+      ctx.font = '800 12.5px "Prompt", sans-serif';
+      ctx.fillText('✓', chkX + 5, my + 14.5);
       ctx.fillStyle = isCur ? '#ffffff' : '#cbd5e1';
-      ctx.font = (isCur ? '700 ' : '500 ') + '10px "Prompt", sans-serif';
-      ctx.fillText(sm, chkX + 20, my + 14);
+      app.fillFittedText(ctx, sm, chkX + 20, my + 14.5, chkW - 24, 12.5, isCur ? '700' : '500', '"Prompt", sans-serif', 'left');
     });
 
     // Bottom Status Bar inside Clip 2
     ctx.fillStyle = '#064e3b';
     ctx.fillRect(clip2X, clip2Y + clip2H - 28, clip2W, 28);
     ctx.fillStyle = '#6ee7b7';
-    ctx.font = '700 10.5px "Prompt", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('✓ Design Conflict: 0  ·  BOM & DWG Synced 100%', clip2X + clip2W / 2, clip2Y + clip2H - 10);
-    ctx.textAlign = 'left';
+    app.fillFittedText(ctx, '✓ Design Conflict: 0  ·  BOM & DWG Synced 100%', clip2X + clip2W / 2, clip2Y + clip2H - 9.5, clip2W - 16, 12.5, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     ctx.restore();
@@ -8606,8 +8518,7 @@
 
   function drawSlide15TeamScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+    const { t } = getCappedMotion(app);
 
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     function easeOutCubic(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
@@ -8714,8 +8625,8 @@
       ctx.fillText(m.name2, cx + colW / 2, yNames + 26 + colShift);
 
       ctx.fillStyle = '#4d6e63';
-      ctx.font = '600 14px "Prompt", "Segoe UI", sans-serif';
-      ctx.fillText(m.role, cx + colW / 2, yNames + 52 + colShift);
+      ctx.font = '600 17px "Prompt", "Segoe UI", sans-serif';
+      ctx.fillText(m.role, cx + colW / 2, yNames + 54 + colShift);
       ctx.textAlign = 'left';
 
       // Photo
@@ -8761,8 +8672,7 @@
 
   function drawSlide16ClosingScene(app, s) {
     const ctx = app.ctx;
-    const t = app.v3MotionEnabled !== false ? Math.max(app._v3motionSeconds || 0, app.slideElapsed || 0) : 10;
-    const nowSec = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000;
+    const { t } = getCappedMotion(app);
 
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     function easeOutCubic(p) { return 1 - Math.pow(1 - clamp(p, 0, 1), 3); }
@@ -8849,23 +8759,30 @@
     ctx.stroke();
 
     ctx.fillStyle = '#fc9459';
-    ctx.font = '800 28px "Prompt", sans-serif';
-    ctx.fillText('ขอบคุณทีมงานและผู้ฟังทุกท่าน', cardX + 130, cardY + 65);
+    ctx.font = '800 31px "Prompt", sans-serif';
+    ctx.fillText('ขอบคุณทีมงานและผู้ฟังทุกท่าน', cardX + 130, cardY + 66);
 
-    // Thank you text lines
-    ctx.fillStyle = '#f0faf5';
-    ctx.font = '600 23px "Prompt", sans-serif';
-    ctx.fillText('สุดท้ายนี้ขอขอบคุณทีมงานทุกท่านที่ร่วมพัฒนา Integrated Design และ BOM Automation ครับ', cardX + 45, cardY + 135);
+    // Thank you key headings (big & clean)
+    ctx.fillStyle = '#ffffff';
+    app.fillFittedText(ctx, 'ขอขอบคุณทีมงานทุกท่านที่ร่วมพัฒนา Integrated Design & BOM Automation ครับ', cardX + 45, cardY + 135, cardW - 90, 26, '700', '"Prompt", sans-serif', 'left');
 
-    ctx.fillStyle = '#d2ebe0';
-    ctx.font = '400 19px "Prompt", sans-serif';
-    ctx.fillText('โครงการนี้เชื่อมความรู้ด้านออกแบบ (Architectural Logic), กฎการทำงาน (Coding & Planning Rules)', cardX + 45, cardY + 195);
-    ctx.fillText('และข้อมูลการผลิต (BOM & Drawing Data) เข้าด้วยกันอย่างเป็นระบบ', cardX + 45, cardY + 235);
-    ctx.fillText('เพื่อช่วยให้กระบวนการทำงานมีความต่อเนื่อง รวดเร็ว และลดข้อผิดพลาดตั้งแต่ต้นทางสู่โรงงานผลิต', cardX + 45, cardY + 275);
+    const closingPoints = [
+      'เชื่อม Architectural Logic + กฎการทำงาน (Coding & P-Rule)',
+      'ผสานข้อมูล BOM & Shop Drawing เป็นหนึ่งเดียวอัตโนมัติ',
+      'เพิ่มความเร็ว แม่นยำ ลดข้อผิดพลาดจากต้นทางสู่โรงงานผลิต'
+    ];
+    closingPoints.forEach((pt, pi) => {
+      const cy = cardY + 195 + pi * 46;
+      ctx.fillStyle = '#34d399';
+      ctx.font = '900 24px "Prompt", sans-serif';
+      ctx.fillText('•', cardX + 48, cy);
+      ctx.fillStyle = '#e2f5ec';
+      app.fillFittedText(ctx, pt, cardX + 76, cy, cardW - 120, 22.5, '600', '"Prompt", sans-serif', 'left');
+    });
 
     ctx.fillStyle = '#34d399';
-    ctx.font = '700 22px "Prompt", sans-serif';
-    ctx.fillText('ขอขอบคุณทุกท่านที่รับฟัง และยินดีตอบทุกข้อซักถามครับ', cardX + 45, cardY + 355);
+    ctx.font = '800 24px "Prompt", sans-serif';
+    ctx.fillText('ขอขอบคุณทุกท่านที่รับฟัง และยินดีตอบทุกข้อซักถามครับ', cardX + 45, cardY + 365);
 
     // 4 Achievement Badges
     const badges = [
@@ -8886,11 +8803,9 @@
       ctx.font = '32px sans-serif';
       ctx.fillText(b.icon, bx + 20, bY + 48);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '700 16px "Prompt", sans-serif';
-      ctx.fillText(b.title, bx + 65, bY + 45);
+      app.fillFittedText(ctx, b.title, bx + 65, bY + 46, bW - 76, 18.5, '700', '"Prompt", sans-serif', 'left');
       ctx.fillStyle = '#34d399';
-      ctx.font = '800 15px "Prompt", sans-serif';
-      ctx.fillText(b.val, bx + 20, bY + 95);
+      app.fillFittedText(ctx, b.val, bx + 20, bY + 96, bW - 36, 17.5, '800', '"Prompt", sans-serif', 'left');
     });
 
     // 4 Studio portraits preview mini strip
@@ -8915,11 +8830,9 @@
         ctx.restore();
       }
       ctx.fillStyle = '#ffffff';
-      ctx.font = '700 16px "Prompt", sans-serif';
-      ctx.fillText(mp.name, mx + 120, mY + 70);
+      app.fillFittedText(ctx, mp.name, mx + 116, mY + 70, mW - 124, 18.5, '700', '"Prompt", sans-serif', 'left');
       ctx.fillStyle = '#78a695';
-      ctx.font = '500 13px "Prompt", sans-serif';
-      ctx.fillText(mp.role, mx + 120, mY + 98);
+      app.fillFittedText(ctx, mp.role, mx + 116, mY + 99, mW - 124, 15.5, '500', '"Prompt", sans-serif', 'left');
     });
     ctx.restore();
 
@@ -8957,25 +8870,30 @@
     qaItems.forEach(item => {
       drawRoundedRect(qX + 45, itY - 26, qW - 90, 52, 12, 'rgba(30, 68, 58, 0.65)', 'rgba(52, 211, 153, 0.25)', 1);
       ctx.fillStyle = '#d8f2e7';
-      ctx.font = '600 17px "Prompt", sans-serif';
-      ctx.fillText(item, qX + 65, itY + 6);
+      app.fillFittedText(ctx, item, qX + 62, itY + 7, qW - 118, 19.5, '600', '"Prompt", sans-serif', 'left');
       itY += 70;
     });
 
     // Footer info
     ctx.textAlign = 'center';
     ctx.fillStyle = '#78a695';
-    ctx.font = '600 17px "Prompt", sans-serif';
+    ctx.font = '600 19px "Prompt", sans-serif';
     ctx.fillText('SCG HEIM · R&D & TOI DEPARTMENT', qX + qW / 2, qY + qH - 55);
     ctx.restore();
   }
 
   PresentationApp.prototype.drawFrame = function(now) {
     const s=this.slides[this.activeSlideIndex];
+    const isExempt12or14 = !!(s && (s.id === 'v3-new-workflow' || s.layout === 'new-workflow-allinone' || s.id === 'v3-results' || s.layout === 'results-full' || s.layout === 'results'));
     if(s) {
       if(this.v3MotionEnabled===undefined)this.v3MotionEnabled=!reduceMotion;
       if(this._v3motionSlide!==s.id){this._v3motionSlide=s.id;this._v3motionSeconds=0;this._v3lastMotion=now;}
-      if(this.v3MotionEnabled)this._v3motionSeconds+=Math.max(0,now-(this._v3lastMotion??now));
+      if(this.v3MotionEnabled) {
+        this._v3motionSeconds+=Math.max(0,now-(this._v3lastMotion??now));
+        if(!isExempt12or14 && this._v3motionSeconds > MOTION_SETTLE_SEC) {
+          this._v3motionSeconds = MOTION_SETTLE_SEC;
+        }
+      }
       this._v3lastMotion=now;
       this._v3time=this._v3motionSeconds||0;
       updateSpeaker(this,s);
@@ -9358,16 +9276,16 @@
 
     // Header Kicker Pill
     ctx.fillStyle = '#059669';
-    this.roundRect(ctx, hdrX + 20, hdrY + 14, 248, 22, 11);
+    this.roundRect(ctx, hdrX + 20, hdrY + 12, 276, 26, 13);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    this.fillFittedText(ctx, 'NEW INTEGRATED DESIGN ENGINE', hdrX + 144, hdrY + 29, 232, 11, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, 'NEW INTEGRATED DESIGN ENGINE', hdrX + 158, hdrY + 29, 258, 13.5, '800', '"Prompt", sans-serif', 'center');
 
     // Header Title & Subtitle
     ctx.fillStyle = '#ffffff';
-    this.fillFittedText(ctx, 'สถาปัตยกรรมระบบออกแบบอัตโนมัติ (4 สายงานคู่ขนาน)', hdrX + 20, hdrY + 64, 860, 26, '800', '"Prompt", sans-serif');
+    this.fillFittedText(ctx, 'สถาปัตยกรรมระบบออกแบบอัตโนมัติ (4 สายงานคู่ขนาน)', hdrX + 20, hdrY + 65, 860, 27, '800', '"Prompt", sans-serif');
     ctx.fillStyle = '#a7f3d0';
-    this.fillFittedText(ctx, '1 โมเดลกลาง OTF + Database & P-Rule ➔ แตกไฟล์ผลิตครบทุกแผนกในคลิกเดียว', hdrX + 20, hdrY + 91, 860, 14.5, '600', '"Prompt", sans-serif');
+    this.fillFittedText(ctx, '1 โมเดลกลาง OTF + Database & P-Rule ➔ แตกไฟล์ผลิตครบทุกแผนกในคลิกเดียว', hdrX + 20, hdrY + 93, 860, 17, '600', '"Prompt", sans-serif');
 
     // Top-Right 3 KPI Summary Pills
     const kpis = [
@@ -9376,7 +9294,7 @@
       { badge: '🎯 100% / ±1mm', label: 'BOQ & CNC Precision', sub: 'ตรงแบบจริงหน้างาน', col: '#f59e0b' }
     ];
     kpis.forEach((kp, ki) => {
-      const kw = 248, kh = 80, kx = hdrX + hdrW - (3 - ki) * (kw + 12), ky = hdrY + 12;
+      const kw = 248, kh = 84, kx = hdrX + hdrW - (3 - ki) * (kw + 12), ky = hdrY + 10;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
       this.roundRect(ctx, kx, ky, kw, kh, 12);
       ctx.fill();
@@ -9385,11 +9303,11 @@
       ctx.stroke();
 
       ctx.fillStyle = kp.col;
-      this.fillFittedText(ctx, kp.badge, kx + 14, ky + 28, kw - 28, 19, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, kp.badge, kx + 14, ky + 27, kw - 28, 20, '800', '"Prompt", sans-serif');
       ctx.fillStyle = '#f8fafc';
-      this.fillFittedText(ctx, kp.label, kx + 14, ky + 50, kw - 28, 13, '700', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, kp.label, kx + 14, ky + 51, kw - 28, 15.5, '700', '"Prompt", sans-serif');
       ctx.fillStyle = '#cbd5e1';
-      this.fillFittedText(ctx, kp.sub, kx + 14, ky + 68, kw - 28, 11.5, '600', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, kp.sub, kx + 14, ky + 72, kw - 28, 14, '600', '"Prompt", sans-serif');
     });
     ctx.restore();
 
@@ -9424,9 +9342,9 @@
       ctx.fill();
 
       ctx.fillStyle = inkMain;
-      this.fillFittedText(ctx, pr.title, px + 26, preY + 29, preW - 36, 15.5, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, pr.title, px + 24, preY + 29, preW - 32, 17.5, '800', '"Prompt", sans-serif');
       ctx.fillStyle = inkMuted;
-      this.fillFittedText(ctx, pr.sub, px + 26, preY + 52, preW - 36, 12.5, '600', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, pr.sub, px + 24, preY + 54, preW - 32, 14.5, '600', '"Prompt", sans-serif');
       ctx.restore();
     });
 
@@ -9479,14 +9397,15 @@
       if (branchGlow) {
         ctx.strokeStyle = color;
         ctx.lineWidth = 8;
-        ctx.globalAlpha = 0.14 + 0.08 * Math.sin(nowSec * 5);
+        ctx.globalAlpha = 0.12 + 0.05 * Math.sin(nowSec * 1.6);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
       }
 
       const count = numOrbs || 2;
       const partSpacing = totalLen / Math.max(1, count);
-      const flowSpeed = (speed || 1.0) * 130;
+      // Calm, slow data orb speed so viewers can follow flows easily without eye strain
+      const flowSpeed = (speed || 1.0) * 28;
       const baseOffset = (nowSec * flowSpeed) % totalLen;
 
       for (let p = 0; p < count; p++) {
@@ -9494,14 +9413,14 @@
         const curPt = getPointAt(curDist);
 
         for (let t = 1; t <= 4; t++) {
-          const tailDist = curDist - t * 8;
+          const tailDist = curDist - t * 6;
           if (tailDist >= 0) {
             const tailPt = getPointAt(tailDist);
             ctx.fillStyle = trailColor || color;
-            ctx.globalAlpha = 0.45 / t;
+            ctx.globalAlpha = 0.36 / t;
             if (typeof ctx.arc === 'function') {
               ctx.beginPath();
-              ctx.arc(tailPt.x, tailPt.y, Math.max(1.5, 4.5 - t * 0.8), 0, Math.PI * 2);
+              ctx.arc(tailPt.x, tailPt.y, Math.max(1.5, 4.0 - t * 0.7), 0, Math.PI * 2);
               ctx.fill();
             }
           }
@@ -9509,19 +9428,19 @@
         ctx.globalAlpha = 1.0;
 
         if (typeof ctx.createRadialGradient === 'function' && typeof ctx.arc === 'function') {
-          const grad = ctx.createRadialGradient(curPt.x, curPt.y, 0, curPt.x, curPt.y, 14);
+          const grad = ctx.createRadialGradient(curPt.x, curPt.y, 0, curPt.x, curPt.y, 11);
           grad.addColorStop(0, '#FFFFFF');
-          grad.addColorStop(0.4, color);
+          grad.addColorStop(0.45, color);
           grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(curPt.x, curPt.y, 14, 0, Math.PI * 2);
+          ctx.arc(curPt.x, curPt.y, 11, 0, Math.PI * 2);
           ctx.fill();
         }
         if (typeof ctx.arc === 'function') {
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
-          ctx.arc(curPt.x, curPt.y, 3.5, 0, Math.PI * 2);
+          ctx.arc(curPt.x, curPt.y, 3.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -9575,7 +9494,7 @@
 
     ctx.save();
     ctx.shadowColor = isOtfActive ? 'rgba(59, 130, 246, 0.45)' : 'rgba(59, 130, 246, 0.14)';
-    ctx.shadowBlur = isOtfActive ? 20 + 6 * Math.sin(nowSec * 6) : 10;
+    ctx.shadowBlur = isOtfActive ? 18 + 4 * Math.sin(nowSec * 2) : 10;
     ctx.fillStyle = nodeFill;
     this.roundRect(ctx, otfBoxX, otfBoxY, otfBoxW, otfBoxH, 18);
     ctx.fill();
@@ -9587,17 +9506,17 @@
 
     // Widened Pill Badge above Box (fit 100% cleanly without overflow!)
     ctx.fillStyle = isOtfActive ? '#2563EB' : '#DBEAFE';
-    this.roundRect(ctx, otfBoxX + 10, otfBoxY - 14, otfBoxW - 20, 24, 12);
+    this.roundRect(ctx, otfBoxX + 6, otfBoxY - 15, otfBoxW - 12, 26, 13);
     ctx.fill();
     ctx.fillStyle = isOtfActive ? '#FFFFFF' : '#1E40AF';
-    this.fillFittedText(ctx, '📥 ARCHITECTURAL INPUT', otfBoxX + otfBoxW / 2, otfBoxY + 2, otfBoxW - 32, 11, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '📥 ARCHITECTURAL INPUT', otfBoxX + otfBoxW / 2, otfBoxY + 2.5, otfBoxW - 22, 13.5, '800', '"Prompt", sans-serif', 'center');
 
     ctx.fillStyle = inkMain;
     this.fillFittedText(ctx, 'OTF', otfBoxX + otfBoxW / 2, otfBoxY + 54, otfBoxW - 24, 28, '800', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = inkMuted;
-    this.fillFittedText(ctx, '(Forcon.)', otfBoxX + otfBoxW / 2, otfBoxY + 84, otfBoxW - 24, 17, '600', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '(Forcon.)', otfBoxX + otfBoxW / 2, otfBoxY + 84, otfBoxW - 24, 18.5, '600', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = '#2563EB';
-    this.fillFittedText(ctx, '2D Plan & Wall Spec', otfBoxX + otfBoxW / 2, otfBoxY + 108, otfBoxW - 24, 12, '700', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '2D Plan & Wall Spec', otfBoxX + otfBoxW / 2, otfBoxY + 110, otfBoxW - 20, 14.5, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     // 7. NODE 2: CORE HUB BOX — Auto BOM & Drawing (Gear cleanly separated!)
@@ -9625,7 +9544,7 @@
 
     ctx.save();
     ctx.shadowColor = isHubActive ? 'rgba(16, 185, 129, 0.52)' : 'rgba(16, 185, 129, 0.18)';
-    ctx.shadowBlur = isHubActive ? 24 + 8 * Math.sin(nowSec * 6) : 12;
+    ctx.shadowBlur = isHubActive ? 20 + 4 * Math.sin(nowSec * 2) : 12;
     ctx.fillStyle = nodeFill;
     this.roundRect(ctx, hubBoxX, hubBoxY, hubBoxW, hubBoxH, 18);
     ctx.fill();
@@ -9636,18 +9555,18 @@
 
     // Top Auto Engine Pill (clearly separated from gear!)
     ctx.fillStyle = isHubActive ? '#10B981' : '#D1FAE5';
-    this.roundRect(ctx, hubBoxX + 18, hubBoxY - 15, hubBoxW - 64, 24, 12);
+    this.roundRect(ctx, hubBoxX + 14, hubBoxY - 16, hubBoxW - 56, 26, 13);
     ctx.fill();
     ctx.strokeStyle = '#10B981';
     ctx.lineWidth = 1.2;
     ctx.stroke();
     ctx.fillStyle = isHubActive ? '#FFFFFF' : '#065F46';
-    this.fillFittedText(ctx, '⚡ AUTO ENGINE (≤ 2 นาที)', hubBoxX + 18 + (hubBoxW - 64) / 2, hubBoxY + 1, hubBoxW - 80, 11.5, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '⚡ AUTO ENGINE (≤ 2 นาที)', hubBoxX + 14 + (hubBoxW - 56) / 2, hubBoxY + 2, hubBoxW - 68, 14, '800', '"Prompt", sans-serif', 'center');
 
     // Animated Gear safely positioned top-right corner clear of pill!
     ctx.save();
     ctx.translate(hubBoxX + hubBoxW - 22, hubBoxY + 26);
-    ctx.rotate(nowSec * 2.2);
+    ctx.rotate(nowSec * 0.55);
     ctx.strokeStyle = '#10B981';
     ctx.lineWidth = 1.8;
     ctx.setLineDash([4, 4]);
@@ -9664,11 +9583,11 @@
     ctx.restore();
 
     ctx.fillStyle = inkMain;
-    this.fillFittedText(ctx, 'Auto BOM & Drawing', hubBoxX + hubBoxW / 2, hubBoxY + 54, hubBoxW - 36, 22, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, 'Auto BOM & Drawing', hubBoxX + hubBoxW / 2, hubBoxY + 54, hubBoxW - 36, 23, '800', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = isDarkSurface ? '#6ee7b7' : '#047857';
-    this.fillFittedText(ctx, '(SketchUp Automation)', hubBoxX + hubBoxW / 2, hubBoxY + 84, hubBoxW - 36, 17, '700', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '(SketchUp Automation)', hubBoxX + hubBoxW / 2, hubBoxY + 84, hubBoxW - 32, 18.5, '700', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = inkMuted;
-    this.fillFittedText(ctx, '✓ Logic & P-Rule Synced 100%', hubBoxX + hubBoxW / 2, hubBoxY + 112, hubBoxW - 36, 12, '700', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '✓ Logic & P-Rule Synced 100%', hubBoxX + hubBoxW / 2, hubBoxY + 114, hubBoxW - 28, 14.5, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     // 8. FAN-OUT BUS FROM AUTO BOM TO 4 BRANCHES
@@ -9702,8 +9621,8 @@
 
     ctx.save();
     if (isDestActive) {
-      const ripT = (nowSec * 3) % 1.5;
-      ctx.strokeStyle = 'rgba(16, 185, 129, ' + Math.max(0, 0.6 - ripT * 0.4) + ')';
+      const ripT = (nowSec * 1.0) % 1.5;
+      ctx.strokeStyle = 'rgba(16, 185, 129, ' + Math.max(0, 0.45 - ripT * 0.3) + ')';
       ctx.lineWidth = 2.5;
       this.roundRect(ctx, destBoxX - ripT * 10, destBoxY - ripT * 10, destBoxW + ripT * 20, destBoxH + ripT * 20, 22);
       ctx.stroke();
@@ -9719,15 +9638,15 @@
     ctx.stroke();
 
     ctx.fillStyle = isDestActive ? '#059669' : '#10B981';
-    this.roundRect(ctx, destBoxX + 18, destBoxY - 15, destBoxW - 36, 24, 12);
+    this.roundRect(ctx, destBoxX + 12, destBoxY - 16, destBoxW - 24, 26, 13);
     ctx.fill();
     ctx.fillStyle = '#FFFFFF';
-    this.fillFittedText(ctx, '🏭 FACTORY ASSEMBLY', destBoxX + destBoxW / 2, destBoxY + 1, destBoxW - 48, 11.5, '800', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '🏭 FACTORY ASSEMBLY', destBoxX + destBoxW / 2, destBoxY + 2, destBoxW - 36, 14, '800', '"Prompt", sans-serif', 'center');
 
     ctx.fillStyle = isDarkSurface ? '#FFFFFF' : '#0F172A';
     this.fillFittedText(ctx, 'Production', destBoxX + destBoxW / 2, destBoxY + 62, destBoxW - 28, 28, '800', '"Prompt", sans-serif', 'center');
     ctx.fillStyle = isDarkSurface ? '#6ee7b7' : '#047857';
-    this.fillFittedText(ctx, '✓ พร้อมผลิต & ประกอบ ±1mm', destBoxX + destBoxW / 2, destBoxY + 96, destBoxW - 28, 14, '700', '"Prompt", sans-serif', 'center');
+    this.fillFittedText(ctx, '✓ พร้อมผลิต & ประกอบ ±1mm', destBoxX + destBoxW / 2, destBoxY + 98, destBoxW - 20, 16, '700', '"Prompt", sans-serif', 'center');
     ctx.restore();
 
     // 10. FOUR PARALLEL BRANCHES (Clean Pill Nodes + Floating Tag CLEARLY above at -38px)
@@ -9736,10 +9655,10 @@
 
     const drawBranchTag = (x, y, label, col, tint) => {
       ctx.save();
-      ctx.font = '700 11px "Prompt", sans-serif';
-      const w = Math.max(122, ctx.measureText(label).width + 20);
+      ctx.font = '700 13.5px "Prompt", sans-serif';
+      const w = Math.max(146, ctx.measureText(label).width + 22);
       ctx.fillStyle = tint;
-      this.roundRect(ctx, x, y, w, 20, 10);
+      this.roundRect(ctx, x, y - 3, w, 24, 12);
       ctx.fill();
       ctx.fillStyle = col;
       ctx.textAlign = 'center';
@@ -9831,7 +9750,7 @@
     ctx.stroke();
 
     ctx.fillStyle = inkMain;
-    this.fillFittedText(ctx, '📄 OUTPUT DELIVERABLES PREVIEW — ผลผลิตจริงที่สร้างอัตโนมัติพร้อมส่งทุกสายงาน', stripX + 18, stripY + 26, stripW - 36, 15, '800', '"Prompt", sans-serif');
+    this.fillFittedText(ctx, '📄 OUTPUT DELIVERABLES PREVIEW — ผลผลิตจริงที่สร้างอัตโนมัติพร้อมส่งทุกสายงาน', stripX + 18, stripY + 26, stripW - 36, 17, '800', '"Prompt", sans-serif');
 
     const docs = this.factoryDocs || {};
     const thumbCards = [
@@ -9870,9 +9789,9 @@
       }
 
       ctx.fillStyle = tc.col;
-      this.fillFittedText(ctx, tc.title, tx + 10, tcY + 118, tcW - 20, 13.5, '800', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, tc.title, tx + 10, tcY + 118, tcW - 20, 15.5, '800', '"Prompt", sans-serif');
       ctx.fillStyle = inkMuted;
-      this.fillFittedText(ctx, tc.sub, tx + 10, tcY + 137, tcW - 20, 11.5, '600', '"Prompt", sans-serif');
+      this.fillFittedText(ctx, tc.sub, tx + 10, tcY + 139, tcW - 20, 13.5, '600', '"Prompt", sans-serif');
       ctx.restore();
     });
     ctx.restore();
@@ -9884,7 +9803,7 @@
 
     ctx.save();
     ctx.fillStyle = '#0F172A';
-    this.roundRect(ctx, bBarX, bBarY, bBarW, 36, 18);
+    this.roundRect(ctx, bBarX, bBarY, bBarW, 38, 19);
     ctx.fill();
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
@@ -9902,13 +9821,10 @@
       const spX = bBarX + 16 + i * sPillW;
       const isCur = activePhase === stg.phase;
       ctx.fillStyle = isCur ? stg.color : 'rgba(255, 255, 255, 0.05)';
-      this.roundRect(ctx, spX + 4, bBarY + 5, sPillW - 8, 26, 13);
+      this.roundRect(ctx, spX + 4, bBarY + 5, sPillW - 8, 28, 14);
       ctx.fill();
       ctx.fillStyle = isCur ? '#FFFFFF' : '#94A3B8';
-      ctx.font = isCur ? '800 12.5px "Prompt", sans-serif' : '600 12px "Prompt", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(stg.title, spX + sPillW / 2, bBarY + 22);
-      ctx.textAlign = 'left';
+      this.fillFittedText(ctx, stg.title, spX + sPillW / 2, bBarY + 24, sPillW - 24, isCur ? 15 : 14.5, isCur ? '800' : '600', '"Prompt", sans-serif', 'center');
     });
     ctx.restore();
 
