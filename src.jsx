@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import './style.css';
 import { installJapanese } from './japanese.js';
+import { exportSlidesToPdf, exportSlidesToPptx } from './export_slides.js';
 
 const fmt = n => `${Math.floor((n || 0) / 60).toString().padStart(2, '0')}:${Math.floor((n || 0) % 60).toString().padStart(2, '0')}`;
 
@@ -27,6 +28,7 @@ function App() {
   const [notes, setNotes] = useState(false);
   const [error, setError] = useState('');
   const [voice, setVoice] = useState(true);
+  const [exportState, setExportState] = useState(null); // { format: 'pptx'|'pdf', current, total } | null
 
   useEffect(() => {
     let instance = null;
@@ -149,6 +151,29 @@ function App() {
     });
   };
 
+  const handleExport = async (format) => {
+    if (!app || exportState) return;
+    setError('');
+    setExportState({ format, current: 0, total: state.slides.length || 0 });
+    try {
+      const opts = {
+        onProgress: ({ current, total }) => {
+          setExportState({ format, current, total });
+        }
+      };
+      if (format === 'pptx') {
+        await exportSlidesToPptx(app, opts);
+      } else {
+        await exportSlidesToPdf(app, opts);
+      }
+    } catch (e) {
+      console.error(`Export ${format} failed:`, e);
+      setError(e?.message || `ไม่สามารถนำออกไฟล์ ${format.toUpperCase()} ได้`);
+    } finally {
+      setExportState(null);
+    }
+  };
+
   const slide = state.slides[state.index];
 
   return (
@@ -201,6 +226,26 @@ function App() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            disabled={!app || Boolean(exportState)}
+            className="control"
+            onClick={() => handleExport('pptx')}
+          >
+            {exportState?.format === 'pptx'
+              ? `กำลังนำออก PPTX (${exportState.current}/${exportState.total})`
+              : 'นำออก PPTX'}
+          </button>
+          <button
+            type="button"
+            disabled={!app || Boolean(exportState)}
+            className="control"
+            onClick={() => handleExport('pdf')}
+          >
+            {exportState?.format === 'pdf'
+              ? `กำลังนำออก PDF (${exportState.current}/${exportState.total})`
+              : 'นำออก PDF'}
+          </button>
           <button
             className="control"
             onClick={() => setMenu(!menu)}
